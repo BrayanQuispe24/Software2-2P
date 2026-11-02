@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ms-entrenamiento-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: entrenamiento_user
+      POSTGRES_PASSWORD: entrenamiento_dev_password
+      POSTGRES_DB: ms_entrenamiento_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_entrenamiento_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U entrenamiento_user -d ms_entrenamiento_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ms-entrenamiento-net
+
+  ms-entrenamiento:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ms-entrenamiento-app
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      APP_NAME: ms-entrenamiento
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8083
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ms_entrenamiento_db
+      DB_USERNAME: entrenamiento_user
+      DB_PASSWORD: entrenamiento_dev_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ms-entrenamiento-net
+
+volumes:
+  postgres_entrenamiento_data:
+
+networks:
+  ms-entrenamiento-net:
+    driver: bridge

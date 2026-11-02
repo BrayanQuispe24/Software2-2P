@@ -1,0 +1,309 @@
+"A datetime string with format `Y-m-d H:i:s`, e.g. `2018-05-23 13:43:32`."
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+"A date string with format `Y-m-d`, e.g. `2011-05-23`."
+scalar Date @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\Date")
+
+# ----------------------------------------------------
+# Tipos de Dominio
+# ----------------------------------------------------
+
+type TipoEjercicio {
+  id: ID!
+  nombre: String!
+  descripcion: String
+  estado: String!
+  ejercicios: [Ejercicio!]! @hasMany(relation: "ejercicios")
+}
+
+type GrupoMuscular {
+  id: ID!
+  nombre: String!
+  descripcion: String
+}
+
+type EjercicioGrupoMuscular {
+  id: ID!
+  tipoParticipacion: String! @rename(attribute: "tipo_participacion")
+  observacion: String
+  grupoMuscular: GrupoMuscular! @belongsTo(relation: "grupoMuscular")
+}
+
+type Ejercicio {
+  id: ID!
+  externalId: String @rename(attribute: "external_id")
+  nombre: String!
+  descripcion: String
+  urlVideo: String @rename(attribute: "url_video")
+  imagenes: [String!]
+  fuerza: String
+  equipamiento: String
+  nivelDificultad: String! @rename(attribute: "nivel_dificultad")
+  mecanica: String
+  patronMovimiento: String @rename(attribute: "patron_movimiento")
+  tipoEjercicio: TipoEjercicio! @belongsTo(relation: "tipoEjercicio")
+  gruposMusculares: [EjercicioGrupoMuscular!]! @hasMany(relation: "gruposMusculares")
+}
+
+type RutinaEjercicio {
+  id: ID!
+  series: Int!
+  repeticiones: Int!
+  peso: Float
+  duracionSegundos: Int @rename(attribute: "duracion_segundos")
+  descansoSegundos: Int @rename(attribute: "descanso_segundos")
+  orden: Int!
+  observacion: String
+  ejercicio: Ejercicio! @belongsTo(relation: "ejercicio")
+}
+
+type Rutina {
+  id: ID!
+  nombre: String!
+  descripcion: String
+  nivel: String!
+  estado: Boolean!
+  rutinaEjercicios: [RutinaEjercicio!]! @hasMany(relation: "rutinaEjercicios")
+}
+
+type PlanEntrenamientoRutina {
+  id: ID!
+  diaSemana: String! @rename(attribute: "dia_semana")
+  rutina: Rutina! @belongsTo(relation: "rutina")
+}
+
+type PlanEntrenamiento {
+  id: ID!
+  idUsuario: ID! @rename(attribute: "id_usuario")
+  nombre: String!
+  objetivo: String!
+  fechaInicio: Date! @rename(attribute: "fecha_inicio")
+  fechaFin: Date! @rename(attribute: "fecha_fin")
+  estado: Boolean!
+  observacion: String
+  rutinasProgramadas: [PlanEntrenamientoRutina!]! @hasMany(relation: "rutinasProgramadas")
+}
+
+type DetallePlanAlimentacion {
+  id: ID!
+  diaSemana: String! @rename(attribute: "dia_semana")
+  tipoComida: String! @rename(attribute: "tipo_comida")
+  alimento: String!
+  cantidad: Float!
+  unidad: String!
+  hora: String
+  calorias: Float
+  proteinas: Float
+  carbohidratos: Float
+  grasas: Float
+  observacion: String
+}
+
+type PlanAlimentacion {
+  id: ID!
+  idUsuario: ID! @rename(attribute: "id_usuario")
+  nombre: String!
+  objetivo: String!
+  fechaInicio: Date! @rename(attribute: "fecha_inicio")
+  fechaFin: Date! @rename(attribute: "fecha_fin")
+  observacion: String
+  estado: Boolean!
+  comidas: [DetallePlanAlimentacion!]! @hasMany(relation: "comidas")
+}
+
+type DetalleHistorial {
+  id: ID!
+  peso: Float!
+  altura: Float!
+  imc: Float!
+  porcentajeGasa: Float @rename(attribute: "porcentaje_grasa")
+  masaMuscular: Float @rename(attribute: "masa_muscular")
+  presion: String
+  fechaRegistro: DateTime! @rename(attribute: "fecha_registro")
+}
+
+type Historial {
+  id: ID!
+  idUsuario: ID! @rename(attribute: "id_usuario")
+  fechaApertura: Date! @rename(attribute: "fecha_apertura")
+  observacionesGenerales: String @rename(attribute: "observaciones_generales")
+  grupoSanguineo: String @rename(attribute: "grupo_sanguineo")
+  sexo: String
+  fechaNacimiento: Date @rename(attribute: "fecha_nacimiento")
+  domicilio: String
+  facultadCarrera: String @rename(attribute: "facultad_carrera")
+  celularEmergencia: String @rename(attribute: "celular_emergencia")
+  detalles: [DetalleHistorial!]! @hasMany(relation: "detalles")
+}
+
+# ----------------------------------------------------
+# Queries
+# ----------------------------------------------------
+
+type Query {
+  # Catálogos
+  tiposEjercicio: [TipoEjercicio!]! @all
+  gruposMusculares: [GrupoMuscular!]! @all
+
+  # Ejercicios
+  ejercicios(
+    tipoEjercicioId: ID @where(key: "id_tipo_ejercicio")
+    nivelDificultad: String @where(key: "nivel_dificultad")
+  ): [Ejercicio!]! @all
+  ejercicioPorId(id: ID! @eq): Ejercicio @find
+
+  # Rutinas
+  rutinas(
+    nivel: String @where
+    estado: Boolean @where
+  ): [Rutina!]! @all
+  rutinaPorId(id: ID! @eq): Rutina @find
+
+  # Planes de Entrenamiento
+  planesEntrenamiento(
+    usuarioId: ID @where(key: "id_usuario")
+    estado: Boolean @where
+  ): [PlanEntrenamiento!]! @all
+
+  planEntrenamientoActivo(
+    usuarioId: ID!
+  ): PlanEntrenamiento @field(resolver: "App\\GraphQL\\Queries\\PlanEntrenamientoActivoQuery")
+
+  # Nutrición
+  planesAlimentacion(
+    usuarioId: ID @where(key: "id_usuario")
+    estado: Boolean @where
+  ): [PlanAlimentacion!]! @all
+
+  planAlimentacionActivo(
+    usuarioId: ID!
+  ): PlanAlimentacion @field(resolver: "App\\GraphQL\\Queries\\PlanAlimentacionActivoQuery")
+
+  # Historial Clínico y Antropometría
+  historialPorUsuario(
+    usuarioId: ID!
+  ): Historial @field(resolver: "App\\GraphQL\\Queries\\HistorialPorUsuarioQuery")
+
+  historiales: [Historial!]! @all
+}
+
+# ----------------------------------------------------
+# Inputs & Mutations
+# ----------------------------------------------------
+
+input GrupoMuscularAsociadoInput {
+  idGrupoMuscular: ID!
+  tipoParticipacion: String! # PRIMARIO, SECUNDARIO, ESTABILIZADOR
+  observacion: String
+}
+
+input CrearEjercicioInput {
+  nombre: String!
+  descripcion: String
+  urlVideo: String
+  imagenes: [String!]
+  fuerza: String
+  equipamiento: String
+  nivelDificultad: String! # PRINCIPIANTE, INTERMEDIO, AVANZADO
+  mecanica: String # AISLADO, COMPUESTO
+  patronMovimiento: String # EMPUJE, TRACCION, DOMINANTE_RODILLA, etc.
+  idTipoEjercicio: ID!
+  gruposMusculares: [GrupoMuscularAsociadoInput!]
+}
+
+input EjercicioRutinaItemInput {
+  idEjercicio: ID!
+  series: Int!
+  repeticiones: Int!
+  peso: Float
+  duracionSegundos: Int
+  descansoSegundos: Int
+  orden: Int!
+  observacion: String
+}
+
+input CrearRutinaInput {
+  nombre: String!
+  descripcion: String
+  nivel: String!
+  ejercicios: [EjercicioRutinaItemInput!]!
+}
+
+input RutinaDiaInput {
+  idRutina: ID!
+  diaSemana: String! # LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO
+}
+
+input AsignarPlanEntrenamientoInput {
+  idUsuario: ID!
+  nombre: String!
+  objetivo: String!
+  fechaInicio: String!
+  fechaFin: String!
+  observacion: String
+  rutinas: [RutinaDiaInput!]!
+}
+
+input ComidaInput {
+  diaSemana: String!
+  tipoComida: String! # DESAYUNO, ALMUERZO, MERIENDA, CENA, COLACION
+  alimento: String!
+  cantidad: Float!
+  unidad: String!
+  hora: String
+  calorias: Float
+  proteinas: Float
+  carbohidratos: Float
+  grasas: Float
+  observacion: String
+}
+
+input AsignarPlanAlimentacionInput {
+  idUsuario: ID!
+  nombre: String!
+  objetivo: String!
+  fechaInicio: String!
+  fechaFin: String!
+  observacion: String
+  comidas: [ComidaInput!]!
+}
+
+input RegistrarMedicionInput {
+  idUsuario: ID!
+  peso: Float!
+  altura: Float!
+  porcentajeGrasa: Float
+  masaMuscular: Float
+  presion: String
+}
+
+input CrearHistorialInput {
+  idUsuario: ID!
+  grupoSanguineo: String
+  sexo: String
+  fechaNacimiento: String
+  domicilio: String
+  facultadCarrera: String
+  celularEmergencia: String
+  observacionesGenerales: String
+}
+
+type Mutation {
+  crearEjercicio(input: CrearEjercicioInput!): Ejercicio!
+    @field(resolver: "App\\GraphQL\\Mutations\\CrearEjercicioMutation")
+
+  crearRutina(input: CrearRutinaInput!): Rutina!
+    @field(resolver: "App\\GraphQL\\Mutations\\CrearRutinaMutation")
+
+  asignarPlanEntrenamiento(input: AsignarPlanEntrenamientoInput!): PlanEntrenamiento!
+    @field(resolver: "App\\GraphQL\\Mutations\\AsignarPlanEntrenamientoMutation")
+
+  asignarPlanAlimentacion(input: AsignarPlanAlimentacionInput!): PlanAlimentacion!
+    @field(resolver: "App\\GraphQL\\Mutations\\AsignarPlanAlimentacionMutation")
+
+  crearHistorial(input: CrearHistorialInput!): Historial!
+    @field(resolver: "App\\GraphQL\\Mutations\\CrearHistorialMutation")
+
+  registrarMedicionProgreso(input: RegistrarMedicionInput!): DetalleHistorial!
+    @field(resolver: "App\\GraphQL\\Mutations\\RegistrarMedicionProgresoMutation")
+}

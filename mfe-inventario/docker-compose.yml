@@ -1,0 +1,9 @@
+services:
+  mfe-inventario:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mfe-inventario-app
+    restart: unless-stopped
+    ports:
+      - "9104:9104"

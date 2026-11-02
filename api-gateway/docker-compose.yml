@@ -1,0 +1,19 @@
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-gateway-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://host.docker.internal:4000/oidc}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-api-gateway}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-example_oidc_client_secret}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      SESSION_SECRET: ${SESSION_SECRET:-example_session_secret_at_least_32_characters_long}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

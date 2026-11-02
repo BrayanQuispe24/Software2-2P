@@ -1,0 +1,9 @@
+services:
+  mfe-gimnasio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mfe-gimnasio-app
+    restart: unless-stopped
+    ports:
+      - "9105:9105"

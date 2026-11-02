@@ -1,0 +1,33 @@
+"""Ejemplo ilustrativo: extender con autorización, paginación y reglas de negocio."""
+type Paciente {
+  id: ID!
+  nombre: String!
+  edad: Int!
+  odontologo: Odontologo
+  consultas: [Consulta!]!
+}
+
+type Odontologo {
+  id: ID!
+  nombre: String!
+}
+
+type Consulta {
+  id: ID!
+  fecha: String!
+  diagnostico: String
+}
+
+input CrearPacienteInput {
+  nombre: String!
+  edad: Int!
+}
+
+type Query {
+  paciente(id: ID!): Paciente
+  pacientes(limit: Int = 20): [Paciente!]!
+}
+
+type Mutation {
+  crearPaciente(input: CrearPacienteInput!): Paciente!
+}

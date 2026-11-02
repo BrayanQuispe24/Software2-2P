@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: ms-auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_dev_password
+      POSTGRES_DB: ms_auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d ms_auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ms-auth-net
+
+  ms-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ms-auth-app
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: "postgresql://auth_user:auth_dev_password@postgres:5432/ms_auth_db?schema=public"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ms-auth-net
+
+volumes:
+  postgres_auth_data:
+
+networks:
+  ms-auth-net:
+    driver: bridge

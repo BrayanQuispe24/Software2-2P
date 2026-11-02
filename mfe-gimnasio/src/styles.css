@@ -1,0 +1,38 @@
+/* ==========================================================================
+   ESTILOS GLOBALES Y RESET ROBUSTO PARA MFE GESTIÓN GIMNASIO (SINGLE-SPA)
+   ========================================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: #ebf4dd;
+  background-color: transparent;
+}
+
+/* Custom Scrollbar moderna y delgada para evitar barras toscas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(12, 20, 25, 0.4);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(144, 171, 139, 0.35);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(144, 171, 139, 0.6);
+}

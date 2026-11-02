@@ -1,0 +1,1217 @@
+<div class="entrenamiento-container">
+  <!-- HEADER & SOCIO CONTEXT COMPACTO -->
+  <header class="dashboard-header compact-header">
+    <div class="header-branding">
+      <div class="brand-row">
+        <span class="brand-badge">MS 3</span>
+        <h1 class="header-title">Planificación Biomecánica & Seguimiento</h1>
+      </div>
+      <p class="header-subtitle">
+        Prescripción de rutinas deterministas, sobrecarga progresiva y control antropométrico.
+      </p>
+    </div>
+
+    <!-- SELECTOR DE SOCIO & BIOMETRÍA COMPACTA -->
+    <div class="socio-card compact-socio">
+      <div class="socio-header-inline">
+        <label for="selectSocio" class="field-label-inline">Socio Activo:</label>
+        <select
+          id="selectSocio"
+          class="custom-select select-compact"
+          [ngModel]="socioId()"
+          (ngModelChange)="cambiarSocio($event)"
+        >
+          @for (s of sociosDisponibles(); track s.id) {
+            <option [value]="s.id">{{ s.nombre }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Quick Biometric Highlights Inline -->
+      <div class="biometric-strip compact-strip">
+        <div class="bio-item-inline">
+          <span class="bio-label">Peso:</span>
+          <span class="bio-val">{{ ultimaMedicion()?.peso ?? '--' }} kg</span>
+        </div>
+        <div class="bio-item-inline">
+          <span class="bio-label">Talla:</span>
+          <span class="bio-val">{{ ultimaMedicion()?.altura ?? '--' }} m</span>
+        </div>
+        <div class="bio-item-inline">
+          <span class="bio-label">IMC:</span>
+          @if (ultimaMedicion(); as med) {
+            <span class="imc-pill-mini" [ngClass]="obtenerClaseIMC(med.imc)">
+              {{ med.imc }} ({{ obtenerTextoIMC(med.imc) }})
+            </span>
+          } @else {
+            <span class="bio-val">--</span>
+          }
+        </div>
+        <div class="bio-item-inline">
+          <span class="bio-label">Grasa/Músc:</span>
+          <span class="bio-val">
+            {{ ultimaMedicion()?.porcentajeGasa ?? '--' }}% / {{ ultimaMedicion()?.masaMuscular ?? '--' }}kg
+          </span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ALERTS -->
+  @if (errorMessage()) {
+    <div class="alert alert-error">
+      <span>{{ errorMessage() }}</span>
+      <button class="btn-close-alert" (click)="errorMessage.set(null)">&times;</button>
+    </div>
+  }
+  @if (successMessage()) {
+    <div class="alert alert-success">
+      <span>{{ successMessage() }}</span>
+      <button class="btn-close-alert" (click)="successMessage.set(null)">&times;</button>
+    </div>
+  }
+
+  <!-- TABS NAVIGATION -->
+  <nav class="nav-tabs" aria-label="Secciones del módulo">
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'ejercicios'"
+      (click)="setTab('ejercicios')"
+    >
+      <span>Catálogo de Ejercicios</span>
+      <span class="tab-counter">{{ ejercicios().length }}</span>
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'rutinas'"
+      (click)="setTab('rutinas')"
+    >
+      <span>Dosificación de Rutinas</span>
+      <span class="tab-counter">{{ rutinas().length }}</span>
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'planes'"
+      (click)="setTab('planes')"
+    >
+      <span>Planes Semanales</span>
+      @if (planActivo()) {
+        <span class="status-indicator-badge">Activo</span>
+      }
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'nutricion'"
+      (click)="setTab('nutricion')"
+    >
+      <span>Macronutrientes & Dietas</span>
+      @if (planNutricion()) {
+        <span class="status-indicator-badge">Prescrito</span>
+      }
+    </button>
+    <button
+      class="tab-btn"
+      [class.active]="activeTab() === 'antropometria'"
+      (click)="setTab('antropometria')"
+    >
+      <span>Historial & Antropometría</span>
+      <span class="tab-counter">{{ historialClinico()?.detalles?.length ?? 0 }}</span>
+    </button>
+  </nav>
+
+  <!-- CONTENT TABS -->
+  <main class="dashboard-body">
+    <!-- ==================== TAB 1: EJERCICIOS ==================== -->
+    @if (activeTab() === 'ejercicios') {
+      <section class="section-pane">
+        <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+        <div class="pane-toolbar exercise-toolbar">
+          <div class="search-box">
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Buscar por nombre, equipo, mecánica..."
+              [ngModel]="busquedaTexto()"
+              (ngModelChange)="busquedaTexto.set($event); paginaActual.set(1)"
+            />
+            @if (busquedaTexto()) {
+              <button class="clear-search-btn" (click)="busquedaTexto.set(''); paginaActual.set(1)">&times;</button>
+            }
+          </div>
+
+          <div class="filter-controls">
+            <select
+              class="filter-select"
+              [ngModel]="filtroTipoId()"
+              (ngModelChange)="filtroTipoId.set($event); paginaActual.set(1)"
+            >
+              <option value="">Todas las Categorías</option>
+              @for (t of tiposEjercicio(); track t.id) {
+                <option [value]="t.id">{{ t.nombre }}</option>
+              }
+            </select>
+
+            <select
+              class="filter-select"
+              [ngModel]="filtroNivel()"
+              (ngModelChange)="filtroNivel.set($event); paginaActual.set(1)"
+            >
+              <option value="">Todos los Niveles</option>
+              <option value="PRINCIPIANTE">Principiante</option>
+              <option value="INTERMEDIO">Intermedio</option>
+              <option value="AVANZADO">Avanzado</option>
+            </select>
+
+            <select
+              class="filter-select"
+              [ngModel]="filtroGrupoId()"
+              (ngModelChange)="filtroGrupoId.set($event); paginaActual.set(1)"
+            >
+              <option value="">Todos los Músculos</option>
+              @for (gm of gruposMusculares(); track gm.id) {
+                <option [value]="gm.id">{{ gm.nombre }}</option>
+              }
+            </select>
+
+            <select
+              class="filter-select"
+              [ngModel]="filtroFuerza()"
+              (ngModelChange)="filtroFuerza.set($event); paginaActual.set(1)"
+            >
+              <option value="">Cualquier Vector</option>
+              <option value="EMPUJE">Empuje (Push)</option>
+              <option value="TRACCION">Tracción (Pull)</option>
+              <option value="ESTATICO">Estático / Isometría</option>
+            </select>
+          </div>
+
+          <button class="btn-action primary" (click)="abrirModalEjercicio()">
+            + Nuevo Ejercicio
+          </button>
+        </div>
+
+        <!-- RESUMEN DE RESULTADOS Y CONTROL DE PÁGINA -->
+        <div class="results-bar">
+          <div class="results-info-group">
+            <span class="results-count">
+              Mostrando <strong>{{ primerItem() }}-{{ ultimoItem() }}</strong> de <strong>{{ ejerciciosFiltrados().length }}</strong> ejercicios
+              <span class="total-catalog">(Total: {{ ejercicios().length }})</span>
+            </span>
+            @if (busquedaTexto() || filtroTipoId() || filtroNivel() || filtroGrupoId() || filtroFuerza()) {
+              <button class="btn-clear-filters" (click)="limpiarFiltros()">Limpiar filtros</button>
+            }
+          </div>
+
+          <div class="page-size-selector">
+            <span class="page-size-label">Ítems por pág:</span>
+            <div class="page-size-chips">
+              @for (tam of tamanosDisponibles; track tam) {
+                <button
+                  type="button"
+                  class="size-chip"
+                  [class.active]="tamanoPagina() === tam"
+                  (click)="cambiarTamanoPagina(tam)"
+                >
+                  {{ tam }}
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- GRID DE TARJETAS -->
+        <div class="exercise-grid">
+          @for (e of ejerciciosPaginados(); track e.id) {
+            <article class="exercise-card" (click)="abrirModalDetalle(e)">
+              <div class="card-thumb-wrap">
+                @if (obtenerImagenPrincipal(e); as imgUrl) {
+                  <img [src]="imgUrl" [alt]="e.nombre" class="exercise-thumb" loading="lazy" />
+                } @else {
+                  <div class="exercise-thumb-placeholder">
+                    <span class="placeholder-icon"></span>
+                  </div>
+                }
+                <div class="thumb-badges">
+                  <span class="badge-tag difficulty" [class]="e.nivelDificultad.toLowerCase()">
+                    {{ e.nivelDificultad }}
+                  </span>
+                  @if (e.fuerza) {
+                    <span class="badge-tag force">{{ e.fuerza }}</span>
+                  }
+                </div>
+              </div>
+
+              <div class="card-details">
+                <span class="badge-tag type">{{ e.tipoEjercicio?.nombre || 'General' }}</span>
+                <h3 class="exercise-name" [title]="e.nombre">{{ e.nombre }}</h3>
+
+                <div class="exercise-meta">
+                  <div class="meta-row">
+                    <span class="meta-label">Equipo:</span>
+                    <span class="meta-val">{{ e.equipamiento || 'Libre' }}</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">Mecánica:</span>
+                    <span class="meta-val">{{ e.mecanica || 'N/A' }}</span>
+                  </div>
+                </div>
+
+                <div class="muscles-section">
+                  <div class="muscle-tags">
+                    @for (gm of (e.gruposMusculares?.slice(0, 3)); track gm.id) {
+                      <span class="muscle-pill" [class.primary-muscle]="gm.tipoParticipacion === 'PRIMARIO'">
+                        {{ gm.grupoMuscular.nombre }}
+                      </span>
+                    }
+                    @if ((e.gruposMusculares?.length || 0) > 3) {
+                      <span class="muscle-pill more">+{{ (e.gruposMusculares?.length || 0) - 3 }}</span>
+                    }
+                  </div>
+                </div>
+
+                <button class="btn-view-exercise" (click)="$event.stopPropagation(); abrirModalDetalle(e)">
+                  Ver Ficha Biomecánica →
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <div class="empty-state">
+              <p>No se encontraron ejercicios con los criterios especificados.</p>
+              <button class="btn-action secondary" (click)="limpiarFiltros()">Restablecer Filtros</button>
+            </div>
+          }
+        </div>
+
+        <!-- BARRA DE PAGINACIÓN INTERACTIVA -->
+        @if (totalPaginas() > 1) {
+          <nav class="pagination-bar" aria-label="Paginación de Ejercicios">
+            <div class="pagination-nav-group">
+              <button
+                type="button"
+                class="page-btn page-arrow"
+                [disabled]="paginaActual() === 1"
+                (click)="irAPagina(1)"
+                title="Primera página"
+              >
+                ««
+              </button>
+              <button
+                type="button"
+                class="page-btn page-arrow"
+                [disabled]="paginaActual() === 1"
+                (click)="paginaAnterior()"
+                title="Página anterior"
+              >
+                ‹ Anterior
+              </button>
+
+              <div class="page-numbers-list">
+                @for (item of paginasNumeradas(); track $index) {
+                  @if (item === '...') {
+                    <span class="page-ellipsis">…</span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="page-number-btn"
+                      [class.active]="paginaActual() === +item"
+                      (click)="irAPagina(+item)"
+                    >
+                      {{ item }}
+                    </button>
+                  }
+                }
+              </div>
+
+              <button
+                type="button"
+                class="page-btn page-arrow"
+                [disabled]="paginaActual() === totalPaginas()"
+                (click)="paginaSiguiente()"
+                title="Página siguiente"
+              >
+                Siguiente ›
+              </button>
+              <button
+                type="button"
+                class="page-btn page-arrow"
+                [disabled]="paginaActual() === totalPaginas()"
+                (click)="irAPagina(totalPaginas())"
+                title="Última página"
+              >
+                »»
+              </button>
+            </div>
+
+            <div class="pagination-quick-jump">
+              <span class="jump-label">Página:</span>
+              <input
+                type="number"
+                min="1"
+                [max]="totalPaginas()"
+                [value]="paginaActual()"
+                #jumpInput
+                (keydown.enter)="irAPagina(+jumpInput.value)"
+                class="jump-input"
+              />
+              <span class="jump-total">/ {{ totalPaginas() }}</span>
+              <button
+                type="button"
+                class="btn-jump"
+                (click)="irAPagina(+jumpInput.value)"
+              >
+                Ir
+              </button>
+            </div>
+          </nav>
+        }
+      </section>
+    }
+
+    <!-- ==================== TAB 2: RUTINAS ==================== -->
+    @if (activeTab() === 'rutinas') {
+      <section class="section-pane">
+        <div class="pane-toolbar">
+          <div class="pane-info">
+            <h2 class="pane-title">Protocolos & Dosificación de Rutinas</h2>
+            <p class="pane-desc">Definición de series, repeticiones, cargas progresivas (kg) y tiempos de descanso.</p>
+          </div>
+          <button class="btn-action primary" (click)="abrirModalRutina()">
+            + Estructurar Rutina
+          </button>
+        </div>
+
+        <div class="routines-list">
+          @for (r of rutinas(); track r.id) {
+            <div class="routine-card">
+              <div class="routine-header">
+                <div>
+                  <div class="routine-title-wrap">
+                    <h3 class="routine-name">{{ r.nombre }}</h3>
+                    <span class="badge-tag difficulty" [class]="r.nivel.toLowerCase()">{{ r.nivel }}</span>
+                  </div>
+                  <p class="routine-desc">{{ r.descripcion }}</p>
+                </div>
+                <span class="routine-badge-active">{{ r.rutinaEjercicios?.length || 0 }} Ejercicios</span>
+              </div>
+
+              <!-- Tabla de Dosificación -->
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th># Orden</th>
+                      <th>Ejercicio Biomecánico</th>
+                      <th>Series</th>
+                      <th>Repeticiones</th>
+                      <th>Carga (kg)</th>
+                      <th>Descanso (s)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (re of r.rutinaEjercicios; track re.id) {
+                      <tr>
+                        <td class="col-orden">{{ re.orden }}</td>
+                        <td>
+                          <strong>{{ re.ejercicio.nombre }}</strong>
+                          <span class="text-muted block">{{ re.ejercicio.tipoEjercicio?.nombre }}</span>
+                        </td>
+                        <td><span class="pill-metric">{{ re.series }} series</span></td>
+                        <td><span class="pill-metric">{{ re.repeticiones }} reps</span></td>
+                        <td><span class="pill-metric highlight">{{ re.peso || 0 }} kg</span></td>
+                        <td>{{ re.descansoSegundos || 60 }} seg</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state">
+              <p>No hay rutinas registradas en el sistema.</p>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ==================== TAB 3: PLANES SEMANALES ==================== -->
+    @if (activeTab() === 'planes') {
+      <section class="section-pane">
+        <div class="pane-toolbar">
+          <div class="pane-info">
+            <h2 class="pane-title">Plan de Entrenamiento Semanal del Socio</h2>
+            <p class="pane-desc">Programación semanal con distribución de cargas y días de descanso.</p>
+          </div>
+          <button class="btn-action primary" (click)="abrirModalPlan()">
+            + Asignar / Actualizar Plan
+          </button>
+        </div>
+
+        @if (planActivo(); as plan) {
+          <div class="active-plan-banner">
+            <div class="plan-summary">
+              <div class="plan-badge">PLAN EN CURSO</div>
+              <h3 class="plan-name">{{ plan.nombre }}</h3>
+              <p class="plan-objective"><strong>Objetivo:</strong> {{ plan.objetivo }}</p>
+              <div class="plan-dates">
+                <span>Vigencia: <strong>{{ plan.fechaInicio }}</strong> al <strong>{{ plan.fechaFin }}</strong></span>
+                @if (plan.observacion) {
+                  <span class="plan-obs">• {{ plan.observacion }}</span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="weekly-schedule">
+            @for (dia of ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']; track dia) {
+              <div class="day-column">
+                <div class="day-header">{{ dia }}</div>
+                <div class="day-content">
+                  <!-- Rutina asignada a este día -->
+                  @let rutinasDelDia = plan.rutinasProgramadas;
+                  @for (rp of rutinasDelDia; track rp.id) {
+                    @if (rp.diaSemana === dia) {
+                      <div class="scheduled-routine-card">
+                        <span class="scheduled-badge">Rutina Programada</span>
+                        <h4 class="routine-title">{{ rp.rutina.nombre }}</h4>
+                        <span class="routine-lvl">{{ rp.rutina.nivel }}</span>
+                        <div class="routine-mini-items">
+                          @for (re of rp.rutina.rutinaEjercicios; track re.id) {
+                            <div class="mini-exercise-row">
+                              <span>{{ re.ejercicio.nombre }}</span>
+                              <small>{{ re.series }}x{{ re.repeticiones }} ({{ re.peso }}kg)</small>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <p>Este socio no cuenta con un plan de entrenamiento semanal activo actualmente.</p>
+            <button class="btn-action primary" (click)="abrirModalPlan()">Asignar Plan Ahora</button>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ==================== TAB 4: NUTRICIÓN ==================== -->
+    @if (activeTab() === 'nutricion') {
+      <section class="section-pane">
+        <div class="pane-toolbar">
+          <div class="pane-info">
+            <h2 class="pane-title">Plan de Alimentación & Macronutrientes</h2>
+            <p class="pane-desc">Prescripción nutricional con cálculo determinista de calorías y macronutrientes.</p>
+          </div>
+          <button class="btn-action primary" (click)="abrirModalNutricion()">
+            + Prescribir Pauta Nutricional
+          </button>
+        </div>
+
+        @if (planNutricion(); as plan) {
+          <!-- Tarjetas de Macros Diarios -->
+          <div class="macros-grid">
+            <div class="macro-card calories">
+              <span class="macro-title">Calorías Diarias</span>
+              <span class="macro-val">{{ totalesNutricion().calorias }} <small>kcal</small></span>
+              <span class="macro-sub">Energía total prescrita</span>
+            </div>
+            <div class="macro-card proteins">
+              <span class="macro-title">Proteínas</span>
+              <span class="macro-val">{{ totalesNutricion().proteinas }} <small>g</small></span>
+              <span class="macro-sub">Aporte para síntesis proteica</span>
+            </div>
+            <div class="macro-card carbs">
+              <span class="macro-title">Carbohidratos</span>
+              <span class="macro-val">{{ totalesNutricion().carbohidratos }} <small>g</small></span>
+              <span class="macro-sub">Combustible glucolítico</span>
+            </div>
+            <div class="macro-card fats">
+              <span class="macro-title">Grasas Saludables</span>
+              <span class="macro-val">{{ totalesNutricion().grasas }} <small>g</small></span>
+              <span class="macro-sub">Función hormonal y articular</span>
+            </div>
+          </div>
+
+          <!-- Pauta de Comidas -->
+          <div class="meals-container">
+            <div class="meals-header">
+              <h3 class="meals-plan-title">{{ plan.nombre }}</h3>
+              <span class="meals-objective">Objetivo: {{ plan.objetivo }}</span>
+            </div>
+
+            <div class="meals-list">
+              @for (c of plan.comidas; track c.id) {
+                <div class="meal-row">
+                  <div class="meal-timing">
+                    <span class="meal-type">{{ c.tipoComida }}</span>
+                    <span class="meal-time">{{ c.hora || '08:00' }}</span>
+                  </div>
+                  <div class="meal-details">
+                    <h4 class="meal-name">{{ c.alimento }}</h4>
+                    <span class="meal-portion">{{ c.cantidad }} {{ c.unidad }}</span>
+                    @if (c.observacion) {
+                      <span class="meal-obs">• {{ c.observacion }}</span>
+                    }
+                  </div>
+                  <div class="meal-macros">
+                    <span class="pill-metric highlight">{{ c.calorias || 0 }} kcal</span>
+                    <span class="pill-metric">P: {{ c.proteinas || 0 }}g</span>
+                    <span class="pill-metric">C: {{ c.carbohidratos || 0 }}g</span>
+                    <span class="pill-metric">G: {{ c.grasas || 0 }}g</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <p>El socio no tiene una pauta nutricional activa registrada.</p>
+            <button class="btn-action primary" (click)="abrirModalNutricion()">Prescribir Nutrición Ahora</button>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ==================== TAB 5: ANTROPOMETRÍA ==================== -->
+    @if (activeTab() === 'antropometria') {
+      <section class="section-pane">
+        <div class="pane-toolbar">
+          <div class="pane-info">
+            <h2 class="pane-title">Expediente Clínico & Control Antropométrico</h2>
+            <p class="pane-desc">Seguimiento biométrico con cálculo automático del Índice de Masa Corporal (IMC).</p>
+          </div>
+          <button class="btn-action primary" (click)="abrirModalMedicion()">
+            + Registrar Nueva Medición
+          </button>
+        </div>
+
+        @if (historialClinico(); as hist) {
+          <!-- Ficha Resumen -->
+          <div class="clinical-dossier">
+            <div class="dossier-item">
+              <span class="d-label">Grupo Sanguíneo:</span>
+              <span class="d-val">{{ hist.grupoSanguineo || 'No especificado' }}</span>
+            </div>
+            <div class="dossier-item">
+              <span class="d-label">Sexo:</span>
+              <span class="d-val">{{ hist.sexo || 'M' }}</span>
+            </div>
+            <div class="dossier-item">
+              <span class="d-label">Carrera / Ocupación:</span>
+              <span class="d-val">{{ hist.facultadCarrera || 'Ingeniería de Sistemas' }}</span>
+            </div>
+            <div class="dossier-item">
+              <span class="d-label">Contacto Emergencia:</span>
+              <span class="d-val">{{ hist.celularEmergencia || '+591 70011223' }}</span>
+            </div>
+            <div class="dossier-item">
+              <span class="d-label">Fecha Apertura:</span>
+              <span class="d-val">{{ hist.fechaApertura }}</span>
+            </div>
+          </div>
+
+          <!-- Histórico de Mediciones -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha de Registro</th>
+                  <th>Peso (kg)</th>
+                  <th>Altura (m)</th>
+                  <th>IMC (kg/m²)</th>
+                  <th>Diagnóstico IMC</th>
+                  <th>% Grasa Corporal</th>
+                  <th>Masa Muscular</th>
+                  <th>Presión Arterial</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of hist.detalles; track d.id) {
+                  <tr>
+                    <td><strong>{{ d.fechaRegistro | date:'medium' }}</strong></td>
+                    <td><span class="pill-metric highlight">{{ d.peso }} kg</span></td>
+                    <td>{{ d.altura }} m</td>
+                    <td><strong class="imc-val">{{ d.imc }}</strong></td>
+                    <td>
+                      <span class="imc-pill" [ngClass]="obtenerClaseIMC(d.imc)">
+                        {{ obtenerTextoIMC(d.imc) }}
+                      </span>
+                    </td>
+                    <td>{{ d.porcentajeGasa || '--' }} %</td>
+                    <td>{{ d.masaMuscular || '--' }} kg</td>
+                    <td>{{ d.presion || '--' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8" class="text-center">No hay registros antropométricos previos.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <p>No se encontró un expediente clínico para este socio.</p>
+            <button class="btn-action primary" (click)="abrirModalMedicion()">Registrar Primera Medición</button>
+          </div>
+        }
+      </section>
+    }
+  </main>
+
+  <!-- ==================== MODALES ==================== -->
+
+  <!-- MODAL: REGISTRAR MEDICIÓN ANTROPOMÉTRICA -->
+  @if (showModalMedicion()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Nueva Medición Antropométrica</h3>
+          <button class="btn-close" (click)="cerrarModalMedicion()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="guardarMedicion()" class="modal-form">
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Peso Corporal (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                class="form-input"
+                [(ngModel)]="nuevaMedicion.peso"
+                name="peso"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label class="field-label">Estatura (m)</label>
+              <input
+                type="number"
+                step="0.01"
+                class="form-input"
+                [(ngModel)]="nuevaMedicion.altura"
+                name="altura"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- Preview IMC Automático -->
+          <div class="imc-preview-box">
+            <span class="preview-title">Cálculo Automático de IMC:</span>
+            <div class="preview-result">
+              <span class="preview-number">{{ imcCalculado() }}</span>
+              <span class="imc-pill" [ngClass]="obtenerClaseIMC(imcCalculado())">
+                {{ obtenerTextoIMC(imcCalculado()) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">% Grasa Estimado</label>
+              <input
+                type="number"
+                step="0.1"
+                class="form-input"
+                [(ngModel)]="nuevaMedicion.porcentajeGrasa"
+                name="grasa"
+              />
+            </div>
+            <div class="form-group">
+              <label class="field-label">Masa Muscular Magra (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                class="form-input"
+                [(ngModel)]="nuevaMedicion.masaMuscular"
+                name="musculo"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label">Presión Arterial (ej. 120/80)</label>
+            <input
+              type="text"
+              class="form-input"
+              [(ngModel)]="nuevaMedicion.presion"
+              name="presion"
+            />
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-action secondary" (click)="cerrarModalMedicion()">Cancelar</button>
+            <button type="submit" class="btn-action primary" [disabled]="loading()">Guardar Medición</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: NUEVO EJERCICIO -->
+  @if (showModalEjercicio()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Registrar Ejercicio en Catálogo</h3>
+          <button class="btn-close" (click)="cerrarModalEjercicio()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="guardarEjercicio()" class="modal-form">
+          <div class="form-group">
+            <label class="field-label">Nombre del Ejercicio *</label>
+            <input
+              type="text"
+              class="form-input"
+              [(ngModel)]="nuevoEjercicio.nombre"
+              name="nombre"
+              placeholder="Ej. Press Militar Sentado"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label">Descripción Biomecánica</label>
+            <textarea
+              class="form-textarea"
+              [(ngModel)]="nuevoEjercicio.descripcion"
+              name="descripcion"
+              rows="2"
+              placeholder="Fase excéntrica controlada, activación escapular..."
+            ></textarea>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Tipo de Ejercicio</label>
+              <select class="form-select" [(ngModel)]="nuevoEjercicio.idTipoEjercicio" name="tipo">
+                @for (t of tiposEjercicio(); track t.id) {
+                  <option [value]="t.id">{{ t.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Nivel de Dificultad</label>
+              <select class="form-select" [(ngModel)]="nuevoEjercicio.nivelDificultad" name="nivel">
+                <option value="PRINCIPIANTE">Principiante</option>
+                <option value="INTERMEDIO">Intermedio</option>
+                <option value="AVANZADO">Avanzado</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Mecánica</label>
+              <select class="form-select" [(ngModel)]="nuevoEjercicio.mecanica" name="mecanica">
+                <option value="COMPUESTO">Compuesto (Multiarticular)</option>
+                <option value="AISLAMIENTO">Aislamiento (Monoarticular)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="field-label">Patrón de Movimiento</label>
+              <select class="form-select" [(ngModel)]="nuevoEjercicio.patronMovimiento" name="patron">
+                <option value="EMPUJE">Empuje (Push)</option>
+                <option value="TRACCION">Tracción (Pull)</option>
+                <option value="DOMINANTE_RODILLA">Dominante Rodilla (Squat)</option>
+                <option value="DOMINANTE_CADERA">Dominante Cadera (Hinge)</option>
+                <option value="CORE_ANTI_ROTACIONAL">Core / Estabilización</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Equipamiento</label>
+              <input
+                type="text"
+                class="form-input"
+                [(ngModel)]="nuevoEjercicio.equipamiento"
+                name="equipo"
+                placeholder="Ej. Barra olímpica, Mancuernas"
+              />
+            </div>
+            <div class="form-group">
+              <label class="field-label">Músculo Primario</label>
+              <select class="form-select" [(ngModel)]="nuevoEjercicio.idGrupoMuscularPrimario" name="musculo">
+                @for (gm of gruposMusculares(); track gm.id) {
+                  <option [value]="gm.id">{{ gm.nombre }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-action secondary" (click)="cerrarModalEjercicio()">Cancelar</button>
+            <button type="submit" class="btn-action primary" [disabled]="loading()">Guardar Ejercicio</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: NUEVA RUTINA -->
+  @if (showModalRutina()) {
+    <div class="modal-backdrop">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h3 class="modal-title">Estructurar Nueva Rutina</h3>
+          <button class="btn-close" (click)="cerrarModalRutina()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="guardarRutina()" class="modal-form">
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Nombre de la Rutina *</label>
+              <input
+                type="text"
+                class="form-input"
+                [(ngModel)]="nuevaRutina.nombre"
+                name="rutinaNombre"
+                placeholder="Ej. Espalda & Bíceps Potencia"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label class="field-label">Nivel de Exigencia</label>
+              <select class="form-select" [(ngModel)]="nuevaRutina.nivel" name="rutinaNivel">
+                <option value="PRINCIPIANTE">Principiante</option>
+                <option value="INTERMEDIO">Intermedio</option>
+                <option value="AVANZADO">Avanzado</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label">Descripción / Foco</label>
+            <input
+              type="text"
+              class="form-input"
+              [(ngModel)]="nuevaRutina.descripcion"
+              name="rutinaDesc"
+              placeholder="Enfoque en tensión mecánica y rango completo de movimiento."
+            />
+          </div>
+
+          <!-- Dosificación de Ejercicios -->
+          <div class="routine-builder-box">
+            <div class="builder-header">
+              <span class="builder-title">Ejercicios & Dosificación</span>
+              <button type="button" class="btn-action secondary small" (click)="agregarEjercicioARutina()">
+                + Agregar Ejercicio
+              </button>
+            </div>
+
+            <div class="builder-items">
+              @for (item of nuevaRutina.ejerciciosSeleccionados; track $index) {
+                <div class="builder-row">
+                  <div class="b-col-exercise">
+                    <label class="field-label-small">Ejercicio</label>
+                    <select class="form-select small" [(ngModel)]="item.idEjercicio" [name]="'ej_' + $index">
+                      @for (e of ejercicios(); track e.id) {
+                        <option [value]="e.id">{{ e.nombre }} ({{ e.nivelDificultad }})</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="b-col-metric">
+                    <label class="field-label-small">Series</label>
+                    <input type="number" class="form-input small" [(ngModel)]="item.series" [name]="'s_' + $index" />
+                  </div>
+                  <div class="b-col-metric">
+                    <label class="field-label-small">Reps</label>
+                    <input type="number" class="form-input small" [(ngModel)]="item.repeticiones" [name]="'r_' + $index" />
+                  </div>
+                  <div class="b-col-metric">
+                    <label class="field-label-small">Carga (kg)</label>
+                    <input type="number" step="0.5" class="form-input small" [(ngModel)]="item.peso" [name]="'p_' + $index" />
+                  </div>
+                  <div class="b-col-metric">
+                    <label class="field-label-small">Descanso (s)</label>
+                    <input type="number" class="form-input small" [(ngModel)]="item.descansoSegundos" [name]="'d_' + $index" />
+                  </div>
+                  <div class="b-col-remove">
+                    <button type="button" class="btn-remove-item" (click)="removerEjercicioDeRutina($index)">&times;</button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-action secondary" (click)="cerrarModalRutina()">Cancelar</button>
+            <button type="submit" class="btn-action primary" [disabled]="loading()">Guardar Rutina</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: ASIGNAR PLAN SEMANAL -->
+  @if (showModalPlan()) {
+    <div class="modal-backdrop">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h3 class="modal-title">Asignar Plan de Entrenamiento Semanal</h3>
+          <button class="btn-close" (click)="cerrarModalPlan()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="guardarPlan()" class="modal-form">
+          <div class="form-group">
+            <label class="field-label">Nombre del Mesociclo / Plan *</label>
+            <input
+              type="text"
+              class="form-input"
+              [(ngModel)]="nuevoPlan.nombre"
+              name="planNombre"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="field-label">Objetivo Principal *</label>
+            <input
+              type="text"
+              class="form-input"
+              [(ngModel)]="nuevoPlan.objetivo"
+              name="planObjetivo"
+              required
+            />
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Fecha de Inicio</label>
+              <input type="date" class="form-input" [(ngModel)]="nuevoPlan.fechaInicio" name="planInicio" />
+            </div>
+            <div class="form-group">
+              <label class="field-label">Fecha de Finalización</label>
+              <input type="date" class="form-input" [(ngModel)]="nuevoPlan.fechaFin" name="planFin" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label">Distribución Semanal de Rutinas</label>
+            <div class="week-assigner">
+              @for (dia of nuevoPlan.dias; track dia.diaSemana) {
+                <div class="assign-day-row">
+                  <span class="day-badge">{{ dia.diaSemana }}</span>
+                  <select class="form-select" [(ngModel)]="dia.idRutina" [name]="'dia_' + dia.diaSemana">
+                    @for (r of rutinas(); track r.id) {
+                      <option [value]="r.id">{{ r.nombre }} ({{ r.nivel }})</option>
+                    }
+                  </select>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-action secondary" (click)="cerrarModalPlan()">Cancelar</button>
+            <button type="submit" class="btn-action primary" [disabled]="loading()">Asignar Plan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: ASIGNAR PLAN NUTRICIONAL -->
+  @if (showModalNutricion()) {
+    <div class="modal-backdrop">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h3 class="modal-title">Prescribir Pauta Alimentaria</h3>
+          <button class="btn-close" (click)="cerrarModalNutricion()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="guardarPlanNutricion()" class="modal-form">
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="field-label">Nombre del Plan *</label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoPlanNutricion.nombre" name="nNombre" required />
+            </div>
+            <div class="form-group">
+              <label class="field-label">Objetivo Metabólico</label>
+              <input type="text" class="form-input" [(ngModel)]="nuevoPlanNutricion.objetivo" name="nObj" required />
+            </div>
+          </div>
+
+          <!-- Listado de Comidas -->
+          <div class="routine-builder-box">
+            <div class="builder-header">
+              <span class="builder-title">Comidas & Macronutrientes</span>
+            </div>
+
+            <div class="builder-items">
+              @for (c of nuevoPlanNutricion.comidas; track $index) {
+                <div class="builder-row meal">
+                  <div style="flex: 1.2;">
+                    <label class="field-label-small">Tipo Comida</label>
+                    <select class="form-select small" [(ngModel)]="c.tipoComida" [name]="'tc_' + $index">
+                      <option value="DESAYUNO">Desayuno</option>
+                      <option value="ALMUERZO">Almuerzo</option>
+                      <option value="MERIENDA">Merienda</option>
+                      <option value="CENA">Cena</option>
+                    </select>
+                  </div>
+                  <div style="flex: 3;">
+                    <label class="field-label-small">Alimento / Receta</label>
+                    <input type="text" class="form-input small" [(ngModel)]="c.alimento" [name]="'al_' + $index" />
+                  </div>
+                  <div style="flex: 1;">
+                    <label class="field-label-small">Kcal</label>
+                    <input type="number" class="form-input small" [(ngModel)]="c.calorias" [name]="'cal_' + $index" />
+                  </div>
+                  <div style="flex: 1;">
+                    <label class="field-label-small">Prot (g)</label>
+                    <input type="number" class="form-input small" [(ngModel)]="c.proteinas" [name]="'pr_' + $index" />
+                  </div>
+                  <div style="flex: 1;">
+                    <label class="field-label-small">Carb (g)</label>
+                    <input type="number" class="form-input small" [(ngModel)]="c.carbohidratos" [name]="'cb_' + $index" />
+                  </div>
+                  <div style="flex: 1;">
+                    <label class="field-label-small">Grasa (g)</label>
+                    <input type="number" class="form-input small" [(ngModel)]="c.grasas" [name]="'gr_' + $index" />
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-action secondary" (click)="cerrarModalNutricion()">Cancelar</button>
+            <button type="submit" class="btn-action primary" [disabled]="loading()">Guardar Pauta</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- ==================== MODAL FICHA BIOMECÁNICA ==================== -->
+  @if (showModalDetalleEjercicio() && ejercicioSeleccionado(); as e) {
+    <div class="modal-backdrop" (click)="cerrarModalDetalle()">
+      <div class="modal-card modal-biomecanico" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-header-info">
+            <span class="badge-tag type">{{ e.tipoEjercicio?.nombre || 'General' }}</span>
+            <h2 class="modal-title">{{ e.nombre }}</h2>
+          </div>
+          <button class="btn-close" (click)="cerrarModalDetalle()">&times;</button>
+        </div>
+
+        <div class="biomecanico-body">
+          <!-- VISUALIZADOR DE FOTOS CON SELECTOR DE FASE -->
+          <div class="biomecanico-visualizer">
+            <div class="visualizer-frame">
+              @if (obtenerImagenFase(e, faseImagenModal()); as currentImg) {
+                <img [src]="currentImg" [alt]="e.nombre" class="biomecanico-img" />
+              } @else {
+                <div class="biomecanico-img-placeholder">
+                  <span>Sin registro fotográfico disponible</span>
+                </div>
+              }
+
+              <!-- Badges de Fase sobre la imagen -->
+              @if (e.imagenes && e.imagenes.length > 1) {
+                <div class="phase-selector">
+                  <button
+                    class="phase-btn"
+                    [class.active]="faseImagenModal() === 0"
+                    (click)="cambiarFaseImagen(0)"
+                  >
+                    1. Posición Inicial
+                  </button>
+                  <button
+                    class="phase-btn"
+                    [class.active]="faseImagenModal() === 1"
+                    (click)="cambiarFaseImagen(1)"
+                  >
+                    2. Ejecución / Contracción
+                  </button>
+                </div>
+              }
+            </div>
+
+            <!-- Meta Biomecánica Rápida -->
+            <div class="quick-meta-grid">
+              <div class="meta-card">
+                <span class="meta-label">Dificultad</span>
+                <span class="badge-tag difficulty" [class]="e.nivelDificultad.toLowerCase()">{{ e.nivelDificultad }}</span>
+              </div>
+              <div class="meta-card">
+                <span class="meta-label">Mecánica</span>
+                <span class="meta-val">{{ e.mecanica || 'N/A' }}</span>
+              </div>
+              <div class="meta-card">
+                <span class="meta-label">Vector Fuerza</span>
+                <span class="meta-val">{{ e.fuerza || 'N/A' }}</span>
+              </div>
+              <div class="meta-card">
+                <span class="meta-label">Equipamiento</span>
+                <span class="meta-val">{{ e.equipamiento || 'Peso Corporal' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- DETALLES E INSTRUCCIONES BIOMECÁNICAS -->
+          <div class="biomecanico-info">
+            <div class="info-block">
+              <h4 class="info-title">Grupos Musculares Involucrados</h4>
+              <div class="muscles-split">
+                <div class="muscle-group-column">
+                  <span class="column-subtitle">Motores Primarios (Agonistas):</span>
+                  <div class="muscle-tags">
+                    @for (gm of e.gruposMusculares; track gm.id) {
+                      @if (gm.tipoParticipacion === 'PRIMARIO' || gm.tipoParticipacion === 'AGONISTA') {
+                        <span class="muscle-pill primary-muscle">{{ gm.grupoMuscular.nombre }}</span>
+                      }
+                    }
+                  </div>
+                </div>
+
+                <div class="muscle-group-column">
+                  <span class="column-subtitle">Sinergistas y Estabilizadores:</span>
+                  <div class="muscle-tags">
+                    @for (gm of e.gruposMusculares; track gm.id) {
+                      @if (gm.tipoParticipacion !== 'PRIMARIO' && gm.tipoParticipacion !== 'AGONISTA') {
+                        <span class="muscle-pill">{{ gm.grupoMuscular.nombre }}</span>
+                      }
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="info-block">
+              <h4 class="info-title">Instrucciones Biomecánicas & Ejecución Técnica</h4>
+              <div class="instructions-content">
+                <p class="instructions-text">{{ e.descripcion || 'Sin instrucciones adicionales registradas.' }}</p>
+              </div>
+            </div>
+
+            @if (e.urlVideo) {
+              <div class="info-block">
+                <h4 class="info-title">Video Demostrativo</h4>
+                <a [href]="e.urlVideo" target="_blank" rel="noopener noreferrer" class="video-link">
+                  ▶ Ver demostración en video externo
+                </a>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-action primary" (click)="cerrarModalDetalle()">
+            Entendido / Cerrar Ficha
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

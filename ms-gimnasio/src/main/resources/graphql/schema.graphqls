@@ -1,0 +1,439 @@
+"""
+Esquema GraphQL Oficial - Microservicio MS2: Gestión del Gimnasio
+ApexFitness Ecosystem (Spring for GraphQL / Java 21)
+"""
+
+scalar DateTime
+scalar Date
+scalar BigDecimal
+
+enum TipoAccesoPlan {
+  ILIMITADO
+  SESIONES
+  DISCIPLINA_ESPECIFICA
+}
+
+enum EstadoSolicitud {
+  PENDIENTE
+  DOCUMENTACION_PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
+
+enum EstadoValidacionDoc {
+  PENDIENTE
+  VALIDADO
+  OBSERVADO
+}
+
+enum EstadoInscripcion {
+  ACTIVA
+  CONGELADA
+  VENCIDA
+  CANCELADA
+}
+
+enum MetodoPago {
+  QR
+  TRANSFERENCIA
+  EFECTIVO
+  TARJETA
+}
+
+enum EstadoPago {
+  PENDIENTE
+  PAGADO
+  RECHAZADO
+  ANULADO
+}
+
+enum TipoMovimientoAcceso {
+  ENTRADA
+  SALIDA
+}
+
+enum EstadoAcceso {
+  PERMITIDO
+  DENEGADO
+}
+
+# ==================== TIPOS DE DOMINIO ====================
+
+type Disciplina {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  capacidadMaxima: Int!
+  colorHex: String
+  activo: Boolean!
+  createdAt: DateTime
+  updatedAt: DateTime
+  horarios: [DisciplinaHorario!]!
+}
+
+type Horario {
+  id: ID!
+  diaSemana: String!
+  horaInicio: String!
+  horaFin: String!
+  turno: String!
+  capacidadAforo: Int!
+  activo: Boolean!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type DisciplinaHorario {
+  id: ID!
+  disciplina: Disciplina!
+  horario: Horario!
+  instructorId: ID
+  cupoDisponible: Int!
+  activo: Boolean!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type Plan {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  duracionDias: Int!
+  sesionesTotales: Int
+  tipoAcceso: TipoAccesoPlan!
+  activo: Boolean!
+  createdAt: DateTime
+  updatedAt: DateTime
+  tarifas: [Tarifa!]!
+}
+
+type Tarifa {
+  id: ID!
+  plan: Plan!
+  nombre: String!
+  monto: BigDecimal!
+  moneda: String!
+  matriculaInscripcion: BigDecimal!
+  fechaInicio: Date!
+  fechaFin: Date
+  activa: Boolean!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type TipoDocumento {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  obligatorio: Boolean!
+  activo: Boolean!
+}
+
+type FormularioSolicitud {
+  id: ID!
+  numeroSolicitud: String!
+  clienteId: ID!
+  plan: Plan!
+  disciplina: Disciplina
+  fechaSolicitud: Date!
+  estado: EstadoSolicitud!
+  motivoRechazo: String
+  observaciones: String
+  documentos: [Documento!]!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type Documento {
+  id: ID!
+  formularioSolicitudId: ID!
+  tipoDocumento: TipoDocumento!
+  nombreArchivo: String!
+  urlArchivo: String!
+  estadoValidacion: EstadoValidacionDoc!
+  observaciones: String
+  fechaSubida: DateTime
+}
+
+type BoletaInscripcion {
+  id: ID!
+  codigoMatricula: String!
+  clienteId: ID!
+  plan: Plan!
+  disciplina: Disciplina
+  disciplinaHorario: DisciplinaHorario
+  formularioSolicitud: FormularioSolicitud
+  fechaInicio: Date!
+  fechaFin: Date!
+  totalSesiones: Int
+  sesionesConsumidas: Int!
+  estado: EstadoInscripcion!
+  boletaPago: BoletaPago
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type BoletaPago {
+  id: ID!
+  boletaInscripcionId: ID!
+  tarifa: Tarifa!
+  numeroComprobante: String!
+  montoSubtotal: BigDecimal!
+  montoDescuento: BigDecimal!
+  montoTotal: BigDecimal!
+  metodoPago: MetodoPago!
+  estado: EstadoPago!
+  codigoTransaccionExterna: String
+  fechaPago: DateTime
+  comprobanteUrl: String
+  createdAt: DateTime
+}
+
+type RegistroAcceso {
+  id: ID!
+  clienteId: ID!
+  boletaInscripcion: BoletaInscripcion
+  tipoMovimiento: TipoMovimientoAcceso!
+  estadoAcceso: EstadoAcceso!
+  fechaHora: DateTime!
+  dispositivoTorniquete: String
+  motivoDenegacion: String
+}
+
+type ValidacionAccesoPayload {
+  permitido: Boolean!
+  mensaje: String!
+  clienteId: ID!
+  codigoMatricula: String
+  planNombre: String
+  sesionesRestantes: Int
+  diasRestantes: Int
+  registroAcceso: RegistroAcceso!
+}
+
+# ==================== INPUTS ====================
+
+input CrearDisciplinaInput {
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  capacidadMaxima: Int!
+  colorHex: String
+}
+
+input CrearHorarioInput {
+  diaSemana: String!
+  horaInicio: String!
+  horaFin: String!
+  turno: String!
+  capacidadAforo: Int!
+}
+
+input ActualizarHorarioInput {
+  diaSemana: String
+  horaInicio: String
+  horaFin: String
+  turno: String
+  capacidadAforo: Int
+  activo: Boolean
+}
+
+input AsignarDisciplinaHorarioInput {
+  disciplinaId: ID!
+  horarioId: ID!
+  instructorId: ID
+  cupoDisponible: Int
+}
+
+input CrearPlanInput {
+  codigo: String!
+  nombre: String!
+  descripcion: String
+  duracionDias: Int!
+  sesionesTotales: Int
+  tipoAcceso: TipoAccesoPlan!
+}
+
+input CrearTarifaInput {
+  planId: ID!
+  nombre: String!
+  monto: BigDecimal!
+  moneda: String
+  matriculaInscripcion: BigDecimal
+  fechaInicio: Date!
+  fechaFin: Date
+}
+
+input CrearSolicitudInput {
+  clienteId: ID!
+  planId: ID!
+  disciplinaId: ID
+  observaciones: String
+}
+
+input AdjuntarDocumentoInput {
+  formularioSolicitudId: ID!
+  tipoDocumentoId: ID!
+  nombreArchivo: String!
+  urlArchivo: String!
+}
+
+input DatosPagoEfectivoInput {
+  montoRecibido: BigDecimal!
+}
+
+input DatosPagoQrInput {
+  comprobanteUrl: String!
+  codigoTransaccion: String
+}
+
+input DatosPagoStripeInput {
+  numeroTarjeta: String
+  expiracionMes: String
+  expiracionAnio: String
+  cvc: String
+  titular: String
+  stripePaymentMethodId: String
+}
+
+input ProcesarInscripcionInput {
+  solicitudId: ID
+  clienteId: ID!
+  planId: ID!
+  tarifaId: ID!
+  disciplinaId: ID
+  disciplinaHorarioId: ID
+  fechaInicio: Date!
+  metodoPago: MetodoPago!
+  montoDescuento: BigDecimal
+  codigoTransaccionExterna: String
+  comprobanteUrl: String
+  datosEfectivo: DatosPagoEfectivoInput
+  datosQr: DatosPagoQrInput
+  datosStripe: DatosPagoStripeInput
+}
+
+input ConfirmarPagoInput {
+  boletaPagoId: ID!
+  metodoPago: MetodoPago
+  codigoTransaccionExterna: String
+  comprobanteUrl: String
+  datosEfectivo: DatosPagoEfectivoInput
+  datosQr: DatosPagoQrInput
+  datosStripe: DatosPagoStripeInput
+}
+
+input ValidarAccesoTorniqueteInput {
+  clienteId: ID!
+  dispositivoTorniquete: String
+  tipoMovimiento: TipoMovimientoAcceso
+}
+
+input ValidarAccesoQrInput {
+  qrPayload: String!
+  dispositivoTorniquete: String
+  tipoMovimiento: TipoMovimientoAcceso
+}
+
+# ==================== ROOT OPERATIONS ====================
+
+type Query {
+  # Catálogo Disciplinas y Horarios
+  disciplinas(soloActivas: Boolean = true): [Disciplina!]!
+  disciplina(id: ID!): Disciplina
+  horarios(soloActivos: Boolean = true): [Horario!]!
+  disciplinaHorarios(disciplinaId: ID): [DisciplinaHorario!]!
+
+  # Planes y Tarifas
+  planes(soloActivos: Boolean = true): [Plan!]!
+  plan(id: ID!): Plan
+  tarifasPorPlan(planId: ID!): [Tarifa!]!
+
+  # Tipo Documentos
+  tiposDocumento: [TipoDocumento!]!
+
+  # Solicitudes
+  solicitudes(estado: EstadoSolicitud, clienteId: ID): [FormularioSolicitud!]!
+  solicitud(id: ID!): FormularioSolicitud
+
+  # Inscripciones
+  inscripciones(clienteId: ID, estado: EstadoInscripcion): [BoletaInscripcion!]!
+  inscripcion(id: ID!): BoletaInscripcion
+  inscripcionActivaCliente(clienteId: ID!): BoletaInscripcion
+
+  # Pagos
+  boletaPago(id: ID!): BoletaPago
+  pagosPorCliente(clienteId: ID!): [BoletaPago!]!
+
+  # Control de Acceso
+  registrosAcceso(clienteId: ID, limite: Int = 50): [RegistroAcceso!]!
+  obtenerQrPaseDigital(inscripcionId: ID!): String!
+}
+
+input ActualizarPlanInput {
+  nombre: String!
+  descripcion: String
+  duracionDias: Int!
+  sesionesTotales: Int
+  tipoAcceso: TipoAccesoPlan!
+  activo: Boolean
+}
+
+input ActualizarTarifaInput {
+  nombre: String!
+  monto: BigDecimal!
+  moneda: String
+  matriculaInscripcion: BigDecimal
+  fechaInicio: Date
+  fechaFin: Date
+  activa: Boolean
+}
+
+input ActualizarDisciplinaInput {
+  nombre: String!
+  descripcion: String
+  capacidadMaxima: Int!
+  colorHex: String
+  activo: Boolean
+}
+
+type Mutation {
+  # Catálogo Disciplinas y Horarios
+  crearDisciplina(input: CrearDisciplinaInput!): Disciplina!
+  actualizarDisciplina(id: ID!, input: ActualizarDisciplinaInput!): Disciplina!
+  eliminarDisciplina(id: ID!): Boolean!
+  actualizarAforoDisciplina(id: ID!, capacidadMaxima: Int!): Disciplina!
+  actualizarCupoHorario(disciplinaHorarioId: ID!, cupoDisponible: Int!): DisciplinaHorario!
+  crearHorario(input: CrearHorarioInput!): Horario!
+  actualizarHorario(id: ID!, input: ActualizarHorarioInput!): Horario!
+  asignarDisciplinaHorario(input: AsignarDisciplinaHorarioInput!): DisciplinaHorario!
+  eliminarDisciplinaHorario(disciplinaHorarioId: ID!): Boolean!
+
+  # Planes y Tarifas
+  crearPlan(input: CrearPlanInput!): Plan!
+  actualizarPlan(id: ID!, input: ActualizarPlanInput!): Plan!
+  eliminarPlan(id: ID!): Boolean!
+  crearTarifa(input: CrearTarifaInput!): Tarifa!
+  actualizarTarifa(id: ID!, input: ActualizarTarifaInput!): Tarifa!
+  eliminarTarifa(id: ID!): Boolean!
+
+  # Solicitudes y Documentos
+  crearSolicitud(input: CrearSolicitudInput!): FormularioSolicitud!
+  adjuntarDocumento(input: AdjuntarDocumentoInput!): Documento!
+  aprobarSolicitud(id: ID!): FormularioSolicitud!
+  rechazarSolicitud(id: ID!, motivo: String!): FormularioSolicitud!
+
+  # Inscripciones y Pagos (Transaccionales)
+  procesarInscripcion(input: ProcesarInscripcionInput!): BoletaInscripcion!
+  confirmarPago(input: ConfirmarPagoInput!): BoletaPago!
+  congelarInscripcion(id: ID!, motivo: String): BoletaInscripcion!
+  reactivarInscripcion(id: ID!): BoletaInscripcion!
+
+  # Control de Acceso (Torniquete ultra-rápido y QR)
+  validarAccesoTorniquete(input: ValidarAccesoTorniqueteInput!): ValidacionAccesoPayload!
+  validarAccesoPorQr(input: ValidarAccesoQrInput!): ValidacionAccesoPayload!
+}

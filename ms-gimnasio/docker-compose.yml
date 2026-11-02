@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: ms-gimnasio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gym_user
+      POSTGRES_PASSWORD: gym_dev_password
+      POSTGRES_DB: ms_gimnasio_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_gimnasio_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gym_user -d ms_gimnasio_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ms-gimnasio-net
+
+  ms-gimnasio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ms-gimnasio-app
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ms_gimnasio_db
+      SPRING_DATASOURCE_USERNAME: gym_user
+      SPRING_DATASOURCE_PASSWORD: gym_dev_password
+      JWT_SECRET: ${JWT_SECRET:-SUPER_SECRET_KEY_FOR_DEV_JWT_APEX_FITNESS_SSO_2026}
+      GYM_QR_SECRET: ${GYM_QR_SECRET:-ApexFitnessGymSecureQrHmacKey2026!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ms-gimnasio-net
+
+volumes:
+  postgres_gimnasio_data:
+
+networks:
+  ms-gimnasio-net:
+    driver: bridge

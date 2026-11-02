@@ -1,0 +1,205 @@
+"A datetime string with format `Y-m-d H:i:s`, e.g. `2018-05-23 13:43:32`."
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+enum EstadoEquipo {
+  OPERATIVO
+  EN_MANTENIMIENTO
+  DE_BAJA
+  EN_REVISION
+}
+
+enum TipoMantenimiento {
+  PREVENTIVO
+  CORRECTIVO
+}
+
+enum EstadoMantenimiento {
+  PROGRAMADO
+  EN_PROCESO
+  COMPLETADO
+  CANCELADO
+}
+
+# ----------------------------------------------------
+# Tipos de Dominio
+# ----------------------------------------------------
+
+type Ambiente {
+  id: ID!
+  nombre: String!
+  descripcion: String
+  estado: String!
+  equipos: [Equipo!]! @hasMany
+}
+
+type Marca {
+  id: ID!
+  nombre: String!
+  estado: String!
+  equipos: [Equipo!]! @hasMany
+}
+
+type TipoEquipo {
+  id: ID!
+  nombre: String!
+  descripcion: String
+  estado: String!
+  equipos: [Equipo!]! @hasMany
+}
+
+type TipoMovimiento {
+  id: ID!
+  nombre: String!
+  descripcion: String
+}
+
+type Equipo {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  modelo: String
+  fechaAdquisicion: String @rename(attribute: "fecha_adquisicion")
+  precioCompra: Float @rename(attribute: "precio_compra")
+  estado: EstadoEquipo!
+  cantidad: Int!
+
+  # Relaciones optimizadas sin N+1 con batch loading de Lighthouse
+  ambiente: Ambiente! @belongsTo(relation: "ambiente")
+  marca: Marca! @belongsTo(relation: "marca")
+  tipoEquipo: TipoEquipo! @belongsTo(relation: "tipoEquipo")
+  mantenimientos: [Mantenimiento!]! @hasMany(relation: "mantenimientos")
+  movimientos: [MovimientoInventario!]! @hasMany(relation: "movimientos")
+}
+
+type Mantenimiento {
+  id: ID!
+  tipo: TipoMantenimiento!
+  fechaInicio: DateTime! @rename(attribute: "fecha_inicio")
+  fechaFin: DateTime @rename(attribute: "fecha_fin")
+  descripcion: String!
+  costo: Float!
+  estado: EstadoMantenimiento!
+  proximoMantenimiento: String @rename(attribute: "proximo_mantenimiento")
+  observacion: String
+  equipo: Equipo! @belongsTo(relation: "equipo")
+}
+
+type MovimientoInventario {
+  id: ID!
+  fechaHora: DateTime! @rename(attribute: "fecha_hora")
+  motivo: String!
+  observacion: String
+  cantidad: Int!
+  equipo: Equipo! @belongsTo(relation: "equipo")
+  tipoMovimiento: TipoMovimiento! @belongsTo(relation: "tipoMovimiento")
+  usuarioId: ID @rename(attribute: "id_usuario")
+}
+
+# ----------------------------------------------------
+# Consultas (Queries)
+# ----------------------------------------------------
+
+type Query {
+  # Equipos
+  equipos(
+    estado: EstadoEquipo @where
+    ambienteId: ID @where(key: "id_ambiente")
+    marcaId: ID @where(key: "id_marca")
+  ): [Equipo!]! @paginate(defaultCount: 20)
+
+  equipoPorId(id: ID! @eq): Equipo @find
+  equipoPorCodigo(codigo: String! @eq): Equipo @find
+
+  # Catálogos
+  ambientes(estado: String @where): [Ambiente!]! @all
+  marcas(estado: String @where): [Marca!]! @all
+  tiposEquipo(estado: String @where): [TipoEquipo!]! @all
+  tiposMovimiento: [TipoMovimiento!]! @all
+
+  # Mantenimientos
+  mantenimientos(
+    equipoId: ID @where(key: "id_equipo")
+    estado: EstadoMantenimiento @where
+  ): [Mantenimiento!]! @all
+
+  alertasMantenimientoProximo(diasMargen: Int = 7): [Mantenimiento!]!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Queries\\AlertasMantenimientoQuery")
+
+  # Kardex
+  kardexPorEquipo(equipoId: ID!): [MovimientoInventario!]!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Queries\\KardexQuery")
+}
+
+# ----------------------------------------------------
+# Mutaciones (Mutations)
+# ----------------------------------------------------
+
+input CrearEquipoInput {
+  codigo: String!
+  nombre: String!
+  modelo: String
+  fechaAdquisicion: String
+  precioCompra: Float
+  cantidadInicial: Int = 1
+  ambienteId: ID!
+  marcaId: ID!
+  tipoEquipoId: ID!
+}
+
+input ProgramarMantenimientoInput {
+  equipoId: ID!
+  tipo: TipoMantenimiento!
+  fechaInicio: String!
+  descripcion: String!
+  costoEstimado: Float
+  proximoMantenimiento: String
+  observacion: String
+}
+
+input RegistrarMovimientoInput {
+  equipoId: ID!
+  tipoMovimientoId: ID!
+  cantidad: Int!
+  motivo: String!
+  observacion: String
+}
+
+type Mutation {
+  crearEquipo(input: CrearEquipoInput!): Equipo!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Mutations\\CrearEquipoMutation")
+
+  actualizarEstadoEquipo(id: ID!, nuevoEstado: EstadoEquipo!): Equipo!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Mutations\\ActualizarEstadoEquipoMutation")
+
+  programarMantenimiento(input: ProgramarMantenimientoInput!): Mantenimiento!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Mutations\\ProgramarMantenimientoMutation")
+
+  completarMantenimiento(id: ID!, costoFinal: Float!, observacion: String): Mantenimiento!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Mutations\\CompletarMantenimientoMutation")
+
+  # Operación Transaccional de Stock y Kardex
+  registrarMovimientoInventario(input: RegistrarMovimientoInput!): MovimientoInventario!
+    @field(resolver: "App\\Infrastructure\\Adapters\\In\\GraphQL\\Mutations\\RegistrarMovimientoMutation")
+
+  # Gestión de Catálogos: Ambientes y Marcas
+  crearAmbiente(
+    nombre: String!
+    descripcion: String
+    estado: String = "ACTIVO"
+  ): Ambiente! @create
+
+  actualizarEstadoAmbiente(
+    id: ID!
+    estado: String!
+  ): Ambiente! @update
+
+  crearMarca(
+    nombre: String!
+    estado: String = "ACTIVO"
+  ): Marca! @create
+
+  actualizarEstadoMarca(
+    id: ID!
+    estado: String!
+  ): Marca! @update
+}

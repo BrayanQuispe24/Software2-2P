@@ -1,0 +1,258 @@
+name: apex-fitness-platform
+
+services:
+  # ==========================================
+  # PERSISTENCIA: BASES DE DATOS POSTGRESQL
+  # ==========================================
+  db-auth:
+    image: postgres:17
+    container_name: global-db-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_dev_password
+      POSTGRES_DB: ms_auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - data-auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d ms_auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fitness-network
+
+  db-gimnasio:
+    image: postgres:17
+    container_name: global-db-gimnasio
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gym_user
+      POSTGRES_PASSWORD: gym_dev_password
+      POSTGRES_DB: ms_gimnasio_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - data-gimnasio:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gym_user -d ms_gimnasio_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fitness-network
+
+  db-inventario:
+    image: postgres:17-alpine
+    container_name: global-db-inventario
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inventario_user
+      POSTGRES_PASSWORD: inventario_dev_password
+      POSTGRES_DB: ms_inventario_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - data-inventario:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventario_user -d ms_inventario_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fitness-network
+
+  db-entrenamiento:
+    image: postgres:17-alpine
+    container_name: global-db-entrenamiento
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: entrenamiento_user
+      POSTGRES_PASSWORD: entrenamiento_dev_password
+      POSTGRES_DB: ms_entrenamiento_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - data-entrenamiento:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U entrenamiento_user -d ms_entrenamiento_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fitness-network
+
+  # ==========================================
+  # AUTENTICACIÓN Y GATEWAY
+  # ==========================================
+  ms-auth:
+    build:
+      context: ./ms-auth
+      dockerfile: Dockerfile
+    container_name: global-ms-auth
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: "postgresql://auth_user:auth_dev_password@db-auth:5432/ms_auth_db?schema=public"
+    depends_on:
+      db-auth:
+        condition: service_healthy
+    networks:
+      - fitness-network
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: global-api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      OIDC_ISSUER: http://ms-auth:4000/oidc
+      OIDC_CLIENT_ID: api-gateway
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-example_oidc_client_secret}
+      OIDC_REDIRECT_URI: http://localhost:3000/auth/callback
+      SESSION_SECRET: ${SESSION_SECRET:-example_session_secret_at_least_32_characters_long}
+      FRONTEND_URL: http://localhost:5173
+    depends_on:
+      - ms-auth
+    networks:
+      - fitness-network
+
+  # ==========================================
+  # MICROSERVICIOS DE DOMINIO
+  # ==========================================
+  ms-gimnasio:
+    build:
+      context: ./ms-gimnasio
+      dockerfile: Dockerfile
+    container_name: global-ms-gimnasio
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-gimnasio:5432/ms_gimnasio_db
+      SPRING_DATASOURCE_USERNAME: gym_user
+      SPRING_DATASOURCE_PASSWORD: gym_dev_password
+      JWT_SECRET: ${JWT_SECRET:-SUPER_SECRET_KEY_FOR_DEV_JWT_APEX_FITNESS_SSO_2026}
+      GYM_QR_SECRET: ${GYM_QR_SECRET:-ApexFitnessGymSecureQrHmacKey2026!}
+    depends_on:
+      db-gimnasio:
+        condition: service_healthy
+    networks:
+      - fitness-network
+
+  ms-inventario:
+    build:
+      context: ./ms-inventario
+      dockerfile: Dockerfile
+    container_name: global-ms-inventario
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      APP_NAME: ms-inventario
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8084
+      DB_CONNECTION: pgsql
+      DB_HOST: db-inventario
+      DB_PORT: 5432
+      DB_DATABASE: ms_inventario_db
+      DB_USERNAME: inventario_user
+      DB_PASSWORD: inventario_dev_password
+    depends_on:
+      db-inventario:
+        condition: service_healthy
+    networks:
+      - fitness-network
+
+  ms-entrenamiento:
+    build:
+      context: ./ms-entrenamiento
+      dockerfile: Dockerfile
+    container_name: global-ms-entrenamiento
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      APP_NAME: ms-entrenamiento
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8083
+      DB_CONNECTION: pgsql
+      DB_HOST: db-entrenamiento
+      DB_PORT: 5432
+      DB_DATABASE: ms_entrenamiento_db
+      DB_USERNAME: entrenamiento_user
+      DB_PASSWORD: entrenamiento_dev_password
+    depends_on:
+      db-entrenamiento:
+        condition: service_healthy
+    networks:
+      - fitness-network
+
+  # ==========================================
+  # CAPA DE FRONTEND (SHELL & MICROFRONTENDS)
+  # ==========================================
+  shell:
+    build:
+      context: ./shell
+      dockerfile: Dockerfile
+    container_name: global-shell-host
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    networks:
+      - fitness-network
+
+  mfe-gimnasio:
+    build:
+      context: ./mfe-gimnasio
+      dockerfile: Dockerfile
+    container_name: global-mfe-gimnasio
+    restart: unless-stopped
+    ports:
+      - "9105:9105"
+    networks:
+      - fitness-network
+
+  mfe-entrenamiento:
+    build:
+      context: ./mfe-entrenamiento
+      dockerfile: Dockerfile
+    container_name: global-mfe-entrenamiento
+    restart: unless-stopped
+    ports:
+      - "9102:9102"
+    networks:
+      - fitness-network
+
+  mfe-inventario:
+    build:
+      context: ./mfe-inventario
+      dockerfile: Dockerfile
+    container_name: global-mfe-inventario
+    restart: unless-stopped
+    ports:
+      - "9104:9104"
+    networks:
+      - fitness-network
+
+volumes:
+  data-auth:
+  data-gimnasio:
+  data-inventario:
+  data-entrenamiento:
+
+networks:
+  fitness-network:
+    driver: bridge

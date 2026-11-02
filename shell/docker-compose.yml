@@ -1,0 +1,9 @@
+services:
+  shell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shell-host-app
+    restart: unless-stopped
+    ports:
+      - "5173:5173"

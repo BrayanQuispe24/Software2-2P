@@ -1,0 +1,6 @@
+export enum EstadoEquipo {
+  OPERATIVO = 'OPERATIVO',
+  EN_MANTENIMIENTO = 'EN_MANTENIMIENTO',
+  DE_BAJA = 'DE_BAJA',
+  EN_REVISION = 'EN_REVISION',
+}

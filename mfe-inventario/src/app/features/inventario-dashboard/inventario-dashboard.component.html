@@ -1,0 +1,707 @@
+<div class="inventario-view-container">
+  <!-- Header de la vista -->
+  <div style="margin-bottom: 1.5rem;">
+    <h2 style="color: var(--palette-cream, #ebf4dd); font-size: 1.55rem; font-weight: 800; font-family: 'Outfit', sans-serif; margin: 0;">
+      Inventario de Equipamiento del Gimnasio
+    </h2>
+    <p class="text-muted" style="margin-top: 0.25rem; font-size: 0.9rem; color: var(--text-secondary, #9bb0a5);">
+      Control de inventario de máquinas, estado físico, distribución en salas y trazabilidad de Kardex
+    </p>
+  </div>
+
+  <!-- Pestañas internas de la vista (Exacto al Shell / UsersManagementPage) -->
+  <div class="users-tabs-bar">
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'equipos'"
+      (click)="setTab('equipos')"
+    >
+      <span>Catálogo de Equipos</span>
+      <span class="tab-count-badge">{{ equipos().length }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'crear-equipo'"
+      (click)="setTab('crear-equipo')"
+    >
+      <span>+ Registrar Nuevo Equipo</span>
+    </button>
+
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'mantenimientos'"
+      (click)="setTab('mantenimientos')"
+    >
+      <span>Mantenimiento & Alertas</span>
+      <span class="tab-count-badge">{{ alertas().length }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'ambientes'"
+      (click)="setTab('ambientes')"
+    >
+      <span>Ambientes / Salas</span>
+      <span class="tab-count-badge">{{ ambientes().length }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="tab-btn"
+      [class.active]="activeTab() === 'marcas'"
+      (click)="setTab('marcas')"
+    >
+      <span>Marcas</span>
+      <span class="tab-count-badge">{{ marcas().length }}</span>
+    </button>
+  </div>
+
+  <!-- Mensajes de feedback -->
+  @if (successMessage()) {
+    <div style="margin-bottom: 1.25rem; padding: 0.85rem 1.25rem; background: rgba(90, 120, 99, 0.2); border: 1px solid rgba(144, 171, 139, 0.4); border-radius: 6px; color: #ebf4dd; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;">
+      <span>{{ successMessage() }}</span>
+      <button style="background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem;" (click)="successMessage.set(null)">&times;</button>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; color: #fca5a5; display: flex; justify-content: space-between; align-items: center;">
+      <span>{{ errorMessage() }}</span>
+      <button style="background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem;" (click)="errorMessage.set(null)">&times;</button>
+    </div>
+  }
+
+  <!-- Loading State -->
+  @if (isLoading()) {
+    <div style="text-align: center; padding: 3rem;">
+      <div class="spinner"></div>
+      <p style="color: var(--text-secondary, #9bb0a5); font-size: 0.9rem;">Cargando información del inventario...</p>
+    </div>
+  }
+
+  <!-- PESTAÑA 1: TABLA PRINCIPAL DE EQUIPOS (EXACTA A USERS MANAGEMENT) -->
+  @if (activeTab() === 'equipos' && !isLoading()) {
+    <div class="card full-width" style="padding: 0; overflow: hidden; border-radius: 6px; background: var(--bg-card, rgba(43, 57, 66, 0.9)); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+        <thead>
+          <tr style="background: rgba(36, 46, 53, 0.7); border-bottom: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Código</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Nombre del Equipo</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Categoría</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Ambiente / Sala</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Marca</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Stock</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Estado</th>
+            <th style="padding: 1rem 0.85rem; text-align: center; color: #ebf4dd;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (equipos().length === 0) {
+            <tr>
+              <td colspan="8" style="padding: 2.5rem; text-align: center; color: var(--text-secondary, #9bb0a5);">
+                No se encontraron equipos registrados en el inventario.
+              </td>
+            </tr>
+          } @else {
+            @for (item of equipos(); track item.id) {
+              <tr style="border-bottom: 1px solid rgba(144, 171, 139, 0.1);">
+                <td style="padding: 0.85rem;">
+                  <code style="color: var(--accent, #90ab8b); background: rgba(56, 189, 248, 0.08); padding: 0.15rem 0.4rem; border-radius: 4px; font-family: monospace;">{{ item.codigo }}</code>
+                </td>
+                <td style="padding: 0.85rem; font-weight: 600; color: var(--palette-cream, #ebf4dd);">
+                  {{ item.nombre }}
+                  @if (item.modelo) {
+                    <span style="color: #9bb0a5; font-size: 0.8rem; font-weight: 400; margin-left: 0.35rem;">({{ item.modelo }})</span>
+                  }
+                </td>
+                <td style="padding: 0.85rem;">
+                  <span class="badge badge-role" style="border-radius: 4px;">{{ item.tipoEquipo.nombre }}</span>
+                </td>
+                <td style="padding: 0.85rem; color: #d1ded0;">{{ item.ambiente.nombre }}</td>
+                <td style="padding: 0.85rem; color: #d1ded0;">{{ item.marca.nombre }}</td>
+                <td style="padding: 0.85rem; font-weight: 700; color: #ebf4dd;">
+                  {{ item.cantidad }} <span style="font-size: 0.78rem; font-weight: 400; color: #9bb0a5;">uds</span>
+                </td>
+                <td style="padding: 0.85rem;">
+                  <span
+                    class="badge"
+                    style="border-radius: 4px;"
+                    [class.badge-perm]="item.estado === 'OPERATIVO'"
+                    [class.badge-warning]="item.estado === 'EN_MANTENIMIENTO'"
+                    [class.badge-danger]="item.estado === 'DE_BAJA'"
+                  >
+                    {{ item.estado }}
+                  </span>
+                </td>
+                <td style="padding: 0.85rem; text-align: center;">
+                  <div style="display: flex; gap: 0.4rem; justify-content: center;">
+                    <button
+                      type="button"
+                      class="btn-secondary"
+                      style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 4px;"
+                      title="Historial de movimientos"
+                      (click)="verKardex(item)"
+                    >
+                      Kardex
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-secondary"
+                      style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 4px;"
+                      title="Entrada o salida de stock"
+                      (click)="openMovimientoModal(item)"
+                    >
+                      Stock
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-secondary"
+                      style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 4px;"
+                      title="Programar servicio técnico"
+                      (click)="openMantenimientoModal(item)"
+                    >
+                      Mantener
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- PESTAÑA 2: FORMULARIO EMBEBIDO DE REGISTRO (EXACTO A USERS MANAGEMENT) -->
+  @if (activeTab() === 'crear-equipo' && !isLoading()) {
+    <div style="display: flex; justify-content: center; width: 100%; margin: 0.5rem 0 2rem 0;">
+      <div class="card" style="max-width: 680px; width: 100%; border: 1px solid var(--border-color, rgba(144, 171, 139, 0.2)); border-radius: 6px; padding: 2rem; background: var(--bg-card, rgba(43, 57, 66, 0.9));">
+        <h3 style="margin-bottom: 0.35rem; color: var(--palette-cream, #ebf4dd); font-size: 1.25rem; font-family: 'Outfit', sans-serif;">
+          Alta de Nuevo Equipamiento Deportivo
+        </h3>
+        <p class="text-muted" style="margin-bottom: 1.5rem; font-size: 0.85rem; color: var(--text-secondary, #9bb0a5);">
+          Registra un nuevo activo asignando su ambiente, fabricante y parámetros de inventario.
+        </p>
+
+        <form (ngSubmit)="submitCrearEquipo()">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; marginBottom: 0.85rem;">
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Código Interno *</label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. EQ-CARDIO-002"
+                [(ngModel)]="nuevoEquipo.codigo"
+                name="codigo"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              />
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Nombre del Equipo *</label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. Bicicleta Spinning Magnética"
+                [(ngModel)]="nuevoEquipo.nombre"
+                name="nombre"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              />
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 0.85rem;">
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Modelo</label>
+              <input
+                type="text"
+                placeholder="Ej. IC7 Coach By Color"
+                [(ngModel)]="nuevoEquipo.modelo"
+                name="modelo"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              />
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Cantidad Inicial *</label>
+              <input
+                type="number"
+                min="1"
+                required
+                [(ngModel)]="nuevoEquipo.cantidadInicial"
+                name="cantidadInicial"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              />
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 0.85rem;">
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Fecha de Adquisición</label>
+              <input
+                type="date"
+                [(ngModel)]="nuevoEquipo.fechaAdquisicion"
+                name="fechaAdquisicion"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              />
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Precio de Compra ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                [(ngModel)]="nuevoEquipo.precioCompra"
+                name="precioCompra"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              />
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 0.85rem;">
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Ambiente / Sala *</label>
+              <select
+                required
+                [(ngModel)]="nuevoEquipo.ambienteId"
+                name="ambienteId"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              >
+                @for (amb of ambientes(); track amb.id) {
+                  <option [value]="amb.id">{{ amb.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Marca / Fabricante *</label>
+              <select
+                required
+                [(ngModel)]="nuevoEquipo.marcaId"
+                name="marcaId"
+                style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+              >
+                @for (m of marcas(); track m.id) {
+                  <option [value]="m.id">{{ m.nombre }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; font-size: 0.8rem; color: var(--palette-cream, #ebf4dd); margin-bottom: 0.35rem; font-weight: 600;">Categoría / Tipo de Equipo *</label>
+            <select
+              required
+              [(ngModel)]="nuevoEquipo.tipoEquipoId"
+              name="tipoEquipoId"
+              style="width: 100%; padding: 0.65rem 0.8rem; background: rgba(36, 46, 53, 0.8); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.25)); border-radius: 5px; color: var(--palette-cream, #ebf4dd); outline: none;"
+            >
+              @for (tipo of tiposEquipo(); track tipo.id) {
+                <option [value]="tipo.id">{{ tipo.nombre }}</option>
+              }
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button
+              type="button"
+              class="btn-secondary"
+              (click)="setTab('equipos')"
+              style="padding: 0.6rem 1.2rem; border-radius: 5px; font-size: 0.88rem;"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              [disabled]="isLoading()"
+              style="padding: 0.6rem 1.4rem; background: linear-gradient(135deg, #5a7863 0%, #4d6955 100%); color: white; border: none; border-radius: 5px; font-size: 0.88rem; font-weight: 600; cursor: pointer;"
+            >
+              Guardar Equipo
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- PESTAÑA 3: TABLA DE MANTENIMIENTOS -->
+  @if (activeTab() === 'mantenimientos' && !isLoading()) {
+    <div class="card full-width" style="padding: 0; overflow: hidden; border-radius: 6px; background: var(--bg-card, rgba(43, 57, 66, 0.9)); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+        <thead>
+          <tr style="background: rgba(36, 46, 53, 0.7); border-bottom: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Equipo</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Tipo</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Descripción / Tarea</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Fecha Inicio</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Próximo Servicio</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Costo Estimado</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Estado</th>
+            <th style="padding: 1rem 0.85rem; text-align: center; color: #ebf4dd;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (alertas().length === 0) {
+            <tr>
+              <td colspan="8" style="padding: 2.5rem; text-align: center; color: var(--text-secondary, #9bb0a5);">
+                No hay alertas de mantenimiento activas o pendientes para este período.
+              </td>
+            </tr>
+          } @else {
+            @for (m of alertas(); track m.id) {
+              <tr style="border-bottom: 1px solid rgba(144, 171, 139, 0.1);">
+                <td style="padding: 0.85rem; font-weight: 600; color: var(--palette-cream, #ebf4dd);">
+                  {{ m.equipoNombre || 'Equipo' }}
+                </td>
+                <td style="padding: 0.85rem;">
+                  <span class="badge badge-role" style="border-radius: 4px;">{{ m.tipo }}</span>
+                </td>
+                <td style="padding: 0.85rem; color: #d1ded0;">{{ m.descripcion }}</td>
+                <td style="padding: 0.85rem; color: #d1ded0;">{{ m.fechaInicio | date: 'shortDate' }}</td>
+                <td style="padding: 0.85rem; color: #d1ded0;">{{ m.proximoMantenimiento || '-' }}</td>
+                <td style="padding: 0.85rem; font-weight: 700; color: #90ab8b;">${{ m.costo.toFixed(2) }}</td>
+                <td style="padding: 0.85rem;">
+                  <span class="badge" style="border-radius: 4px;" [class.badge-perm]="m.estado === 'COMPLETADO'" [class.badge-warning]="m.estado === 'EN_PROCESO'">
+                    {{ m.estado }}
+                  </span>
+                </td>
+                <td style="padding: 0.85rem; text-align: center;">
+                  <div style="display: flex; gap: 0.4rem; justify-content: center;">
+                    @if (m.estado !== 'COMPLETADO') {
+                      <button
+                        type="button"
+                        class="btn-secondary"
+                        style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 4px; color: #6ee7b7; border-color: rgba(16, 185, 129, 0.4);"
+                        (click)="completarMantenimiento(m)"
+                      >
+                        Completar
+                      </button>
+                    } @else {
+                      <span class="badge badge-perm" style="border-radius: 4px;">Listo</span>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- PESTAÑA 4: TABLA DE AMBIENTES -->
+  @if (activeTab() === 'ambientes' && !isLoading()) {
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+      <button
+        type="button"
+        class="btn-secondary"
+        style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-radius: 4px;"
+        (click)="openCrearAmbienteModal()"
+      >
+        + Registrar Nuevo Ambiente
+      </button>
+    </div>
+
+    <div class="card full-width" style="padding: 0; overflow: hidden; border-radius: 6px; background: var(--bg-card, rgba(43, 57, 66, 0.9)); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+        <thead>
+          <tr style="background: rgba(36, 46, 53, 0.7); border-bottom: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Nombre del Ambiente / Sala</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Descripción & Ubicación</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Equipos Asignados</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Estado</th>
+            <th style="padding: 1rem 0.85rem; text-align: center; color: #ebf4dd;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (ambientes().length === 0) {
+            <tr>
+              <td colspan="5" style="padding: 2.5rem; text-align: center; color: var(--text-secondary, #9bb0a5);">
+                No hay ambientes registrados en el sistema.
+              </td>
+            </tr>
+          } @else {
+            @for (amb of ambientes(); track amb.id) {
+              <tr style="border-bottom: 1px solid rgba(144, 171, 139, 0.1);">
+                <td style="padding: 0.85rem; font-weight: 600; color: var(--palette-cream, #ebf4dd);">
+                  {{ amb.nombre }}
+                </td>
+                <td style="padding: 0.85rem; color: #d1ded0;">{{ amb.descripcion || 'Sin descripción' }}</td>
+                <td style="padding: 0.85rem;">
+                  <span class="tab-count-badge" style="font-size: 0.78rem; padding: 0.2rem 0.55rem;">
+                    {{ contarEquiposPorAmbiente(amb.id) }} equipos
+                  </span>
+                </td>
+                <td style="padding: 0.85rem;">
+                  <span class="badge badge-perm" style="border-radius: 4px;">{{ amb.estado || 'ACTIVO' }}</span>
+                </td>
+                <td style="padding: 0.85rem; text-align: center;">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 4px;"
+                    (click)="setTab('equipos')"
+                  >
+                    Ver Equipos
+                  </button>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- PESTAÑA 5: TABLA DE MARCAS -->
+  @if (activeTab() === 'marcas' && !isLoading()) {
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+      <button
+        type="button"
+        class="btn-secondary"
+        style="padding: 0.45rem 0.9rem; font-size: 0.82rem; border-radius: 4px;"
+        (click)="openCrearMarcaModal()"
+      >
+        + Registrar Nueva Marca
+      </button>
+    </div>
+
+    <div class="card full-width" style="padding: 0; overflow: hidden; border-radius: 6px; background: var(--bg-card, rgba(43, 57, 66, 0.9)); border: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+        <thead>
+          <tr style="background: rgba(36, 46, 53, 0.7); border-bottom: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Marca / Fabricante</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Equipos Registrados</th>
+            <th style="padding: 1rem 0.85rem; color: #ebf4dd;">Estado</th>
+            <th style="padding: 1rem 0.85rem; text-align: center; color: #ebf4dd;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (marcas().length === 0) {
+            <tr>
+              <td colspan="4" style="padding: 2.5rem; text-align: center; color: var(--text-secondary, #9bb0a5);">
+                No hay marcas registradas.
+              </td>
+            </tr>
+          } @else {
+            @for (m of marcas(); track m.id) {
+              <tr style="border-bottom: 1px solid rgba(144, 171, 139, 0.1);">
+                <td style="padding: 0.85rem; font-weight: 600; color: var(--palette-cream, #ebf4dd);">
+                  {{ m.nombre }}
+                </td>
+                <td style="padding: 0.85rem;">
+                  <span class="tab-count-badge" style="font-size: 0.78rem; padding: 0.2rem 0.55rem;">
+                    {{ contarEquiposPorMarca(m.id) }} equipos
+                  </span>
+                </td>
+                <td style="padding: 0.85rem;">
+                  <span class="badge badge-perm" style="border-radius: 4px;">{{ m.estado || 'ACTIVO' }}</span>
+                </td>
+                <td style="padding: 0.85rem; text-align: center;">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 4px;"
+                    (click)="setTab('equipos')"
+                  >
+                    Ver Equipos
+                  </button>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- MODAL: PROGRAMAR MANTENIMIENTO -->
+  @if (showMantenimientoModal()) {
+    <div class="modal-overlay" (click)="closeMantenimientoModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Programar Mantenimiento: {{ selectedEquipo()?.nombre }}</h3>
+          <button class="modal-close" (click)="closeMantenimientoModal()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="submitProgramarMantenimiento()">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tipo de Mantenimiento *</label>
+              <select [(ngModel)]="nuevoMantenimiento.tipo" name="tipo" required>
+                <option value="PREVENTIVO">Preventivo</option>
+                <option value="CORRECTIVO">Correctivo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Costo Estimado ($)</label>
+              <input type="number" step="0.01" [(ngModel)]="nuevoMantenimiento.costoEstimado" name="costoEstimado" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Fecha de Inicio *</label>
+              <input type="datetime-local" [(ngModel)]="nuevoMantenimiento.fechaInicio" name="fechaInicio" required />
+            </div>
+            <div class="form-group">
+              <label>Próximo Servicio Sugerido</label>
+              <input type="date" [(ngModel)]="nuevoMantenimiento.proximoMantenimiento" name="proximoMantenimiento" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción / Tarea *</label>
+            <textarea [(ngModel)]="nuevoMantenimiento.descripcion" name="descripcion" rows="3" placeholder="Detalle técnico..." required></textarea>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" (click)="closeMantenimientoModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isLoading()">Programar Servicio</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: REGISTRAR MOVIMIENTO (KARDEX / STOCK) -->
+  @if (showMovimientoModal()) {
+    <div class="modal-overlay" (click)="closeMovimientoModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Movimiento de Inventario: {{ selectedEquipo()?.nombre }}</h3>
+          <button class="modal-close" (click)="closeMovimientoModal()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="submitMovimiento()">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tipo de Movimiento *</label>
+              <select [(ngModel)]="nuevoMovimiento.tipoMovimientoId" name="tipoMovimientoId" required>
+                @for (tm of tiposMovimiento(); track tm.id) {
+                  <option [value]="tm.id">{{ tm.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Cantidad de Unidades *</label>
+              <input type="number" min="1" [(ngModel)]="nuevoMovimiento.cantidad" name="cantidad" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Motivo del Movimiento *</label>
+            <input type="text" [(ngModel)]="nuevoMovimiento.motivo" name="motivo" placeholder="Ej. Adquisición adicional / Traslado a sala B" required />
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" (click)="closeMovimientoModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isLoading()">Actualizar Stock</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: VER KARDEX -->
+  @if (showKardexModal()) {
+    <div class="modal-overlay" (click)="closeKardexModal()">
+      <div class="modal-card modal-lg" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Historial de Kardex: {{ selectedEquipo()?.nombre }}</h3>
+          <button class="modal-close" (click)="closeKardexModal()">&times;</button>
+        </div>
+
+        @if (kardex().length === 0) {
+          <p style="padding: 2.5rem; text-align: center; color: var(--text-secondary, #9bb0a5);">
+            Sin movimientos históricos registrados para este equipo.
+          </p>
+        } @else {
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+              <thead>
+                <tr style="background: rgba(36, 46, 53, 0.7); border-bottom: 1px solid var(--border-color, rgba(144, 171, 139, 0.2));">
+                  <th style="padding: 0.75rem 0.85rem; color: #ebf4dd;">Fecha y Hora</th>
+                  <th style="padding: 0.75rem 0.85rem; color: #ebf4dd;">Tipo</th>
+                  <th style="padding: 0.75rem 0.85rem; color: #ebf4dd;">Cantidad</th>
+                  <th style="padding: 0.75rem 0.85rem; color: #ebf4dd;">Motivo</th>
+                  <th style="padding: 0.75rem 0.85rem; color: #ebf4dd;">Responsable</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (mov of kardex(); track mov.id) {
+                  <tr style="border-bottom: 1px solid rgba(144, 171, 139, 0.1);">
+                    <td style="padding: 0.75rem 0.85rem; color: #d1ded0;">{{ mov.fechaHora | date: 'short' }}</td>
+                    <td style="padding: 0.75rem 0.85rem;"><span class="badge badge-role" style="border-radius: 4px;">{{ mov.tipoMovimiento.nombre }}</span></td>
+                    <td style="padding: 0.75rem 0.85rem; font-weight: 700; color: #ebf4dd;">{{ mov.cantidad }}</td>
+                    <td style="padding: 0.75rem 0.85rem; color: #d1ded0;">{{ mov.motivo }}</td>
+                    <td style="padding: 0.75rem 0.85rem;"><code>{{ mov.usuarioId ? (mov.usuarioId | slice:0:8) + '...' : 'Sistema' }}</code></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeKardexModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: CREAR AMBIENTE -->
+  @if (showCrearAmbienteModal()) {
+    <div class="modal-overlay" (click)="closeCrearAmbienteModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Registrar Nuevo Ambiente</h3>
+          <button class="modal-close" (click)="closeCrearAmbienteModal()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="submitCrearAmbiente()">
+          <div class="form-group">
+            <label>Nombre del Ambiente o Sala *</label>
+            <input type="text" [(ngModel)]="nuevoAmbiente.nombre" name="ambNombre" placeholder="Ej. Sala de Spinning Pro" required />
+          </div>
+
+          <div class="form-group">
+            <label>Descripción / Ubicación</label>
+            <textarea [(ngModel)]="nuevoAmbiente.descripcion" name="ambDesc" rows="3" placeholder="Piso, capacidad estimada u observaciones..."></textarea>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" (click)="closeCrearAmbienteModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isLoading()">Guardar Ambiente</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: REGISTRAR MARCA -->
+  @if (showCrearMarcaModal()) {
+    <div class="modal-overlay" (click)="closeCrearMarcaModal()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Registrar Nueva Marca / Fabricante</h3>
+          <button class="modal-close" (click)="closeCrearMarcaModal()">&times;</button>
+        </div>
+
+        <form (ngSubmit)="submitCrearMarca()">
+          <div class="form-group">
+            <label>Nombre de la Marca *</label>
+            <input type="text" [(ngModel)]="nuevaMarca.nombre" name="marcaNombre" placeholder="Ej. Technogym / Precor / Rogue" required />
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" (click)="closeCrearMarcaModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="isLoading()">Guardar Marca</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</div>

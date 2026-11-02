@@ -1,0 +1,9 @@
+services:
+  mfe-entrenamiento:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mfe-entrenamiento-app
+    restart: unless-stopped
+    ports:
+      - "9102:9102"

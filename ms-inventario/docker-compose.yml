@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ms-inventario-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inventario_user
+      POSTGRES_PASSWORD: inventario_dev_password
+      POSTGRES_DB: ms_inventario_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_inventario_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventario_user -d ms_inventario_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ms-inventario-net
+
+  ms-inventario:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ms-inventario-app
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      APP_NAME: ms-inventario
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8084
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ms_inventario_db
+      DB_USERNAME: inventario_user
+      DB_PASSWORD: inventario_dev_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ms-inventario-net
+
+volumes:
+  postgres_inventario_data:
+
+networks:
+  ms-inventario-net:
+    driver: bridge

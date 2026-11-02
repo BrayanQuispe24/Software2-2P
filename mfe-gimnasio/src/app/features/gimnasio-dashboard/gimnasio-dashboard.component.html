@@ -1,0 +1,2415 @@
+<div class="gimnasio-container">
+  <!-- Barra Superior Unificada: Pestañas a la izquierda y Acciones contextuales a la derecha -->
+  <div class="gimnasio-top-bar">
+    <nav class="users-tabs-bar">
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'inscripciones'"
+        (click)="setActiveTab('inscripciones')"
+      >
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        Inscripciones & Socios
+        <span class="tab-counter">{{ inscripciones().length }}</span>
+      </button>
+
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'pagos'"
+        (click)="setActiveTab('pagos')"
+      >
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+          <line x1="1" y1="10" x2="23" y2="10"></line>
+        </svg>
+        Caja & Pagos
+      </button>
+
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'planes'"
+        (click)="setActiveTab('planes')"
+      >
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        Planes & Tarifario
+        <span class="tab-counter">{{ planes().length }}</span>
+      </button>
+
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'disciplinas'"
+        (click)="setActiveTab('disciplinas')"
+      >
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 16.5l-3 2.5 3 2.5 3-2.5-3-2.5zM18 16.5l-3 2.5 3 2.5 3-2.5-3-2.5zM12 3l-3 2.5 3 2.5 3-2.5-3-2.5z"></path>
+        </svg>
+        Disciplinas & Aforo
+        <span class="tab-counter">{{ disciplinas().length }}</span>
+      </button>
+
+      <button
+        class="tab-btn"
+        [class.active]="activeTab() === 'torniquete'"
+        (click)="setActiveTab('torniquete')"
+      >
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        Control de Acceso / Torniquete
+      </button>
+    </nav>
+
+    <div class="top-bar-actions">
+      @if (activeTab() === 'inscripciones') {
+        <button class="btn btn-primary btn-sm" (click)="abrirModalInscripcion()">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nueva Inscripción
+        </button>
+      }
+      @if (activeTab() === 'planes' && puedeEditarCatalogo()) {
+        <button class="btn btn-primary btn-sm" (click)="showCrearPlanModal.set(true)">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nuevo Plan
+        </button>
+      }
+      @if (activeTab() === 'disciplinas' && puedeEditarCatalogo()) {
+        <button class="btn btn-primary btn-sm" (click)="showCrearDisciplinaModal.set(true)">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nueva Disciplina
+        </button>
+      }
+      @if (esRecepcionista()) {
+        <span style="display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.75rem; background: rgba(144, 171, 139, 0.15); border: 1px solid rgba(144, 171, 139, 0.35); border-radius: 6px; font-size: 0.78rem; font-weight: 600; color: #ebf4dd;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #6ee7b7; box-shadow: 0 0 6px #6ee7b7;"></span>
+          Recepcionista: Modo Operativo
+        </span>
+      }
+      <button class="btn btn-secondary btn-sm" (click)="cargarDatosIniciales()" title="Sincronizar datos con backend GraphQL">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Sincronizar
+      </button>
+    </div>
+  </div>
+
+  <!-- Notificaciones -->
+  @if (errorMessage()) {
+    <div class="alert alert-error">
+      <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span>{{ errorMessage() }}</span>
+      <button class="alert-close" (click)="errorMessage.set(null)">&times;</button>
+    </div>
+  }
+
+  @if (successMessage()) {
+    <div class="alert alert-success">
+      <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+      <span>{{ successMessage() }}</span>
+      <button class="alert-close" (click)="successMessage.set(null)">&times;</button>
+    </div>
+  }
+
+  <!-- Contenido de las Pestañas -->
+  <main class="gimnasio-content">
+    @if (isLoading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Procesando con microservicio GraphQL...</p>
+      </div>
+    }
+
+    <!-- TAB 1: INSCRIPCIONES -->
+    @if (activeTab() === 'inscripciones' && !isLoading()) {
+      <div class="tab-panel">
+        <div class="users-table-container">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>MATRÍCULA</th>
+                <th>CLIENTE / SOCIO</th>
+                <th>PLAN</th>
+                <th>VIGENCIA</th>
+                <th>SESIONES</th>
+                <th>ESTADO</th>
+                <th>PAGO ASOCIADO</th>
+                <th>ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ins of inscripciones(); track ins.id) {
+                <tr>
+                  <td>
+                    <span class="code-badge">{{ ins.codigoMatricula }}</span>
+                  </td>
+                  <td>
+                    <div style="display: flex; flex-direction: column;">
+                      <span class="font-semibold text-light" style="color: #ebf4dd;">
+                        {{ obtenerNombreCliente(ins.clienteId) }}
+                      </span>
+                      <span class="text-xs text-muted" style="font-family: monospace; opacity: 0.75; font-size: 0.72rem;">
+                        {{ ins.clienteId | slice:0:18 }}...
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                      <span class="font-medium text-light">{{ ins.plan?.nombre || 'Plan Estándar' }}</span>
+                      @if (ins.disciplina) {
+                        <span class="badge-mini" [style.backgroundColor]="ins.disciplina.colorHex || '#5A7863'" style="color: #fff; width: fit-content; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 500;">
+                          {{ ins.disciplina.nombre }}
+                        </span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <div class="date-cell">
+                      <span>{{ ins.fechaInicio }}</span>
+                      <span class="date-sep">→</span>
+                      <span class="font-semibold">{{ ins.fechaFin }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    @if (ins.totalSesiones) {
+                      <span class="sesiones-counter">
+                        {{ ins.sesionesConsumidas }} / {{ ins.totalSesiones }}
+                      </span>
+                    } @else {
+                      <span class="sesiones-unlimited">Ilimitado</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="badge" [class]="'badge-' + ins.estado.toLowerCase()">
+                      {{ ins.estado }}
+                    </span>
+                  </td>
+                  <td>
+                    @if (ins.boletaPago) {
+                      <div class="pago-pill">
+                        <span>{{ ins.boletaPago.numeroComprobante }}</span>
+                        <span class="pago-monto">{{ ins.boletaPago.montoTotal }} BOB</span>
+                        <span class="badge-mini" [class]="'mini-' + ins.boletaPago.estado.toLowerCase()">
+                          {{ ins.boletaPago.estado }}
+                        </span>
+                      </div>
+                    } @else {
+                      <span class="text-muted">Sin boleta</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="action-buttons">
+                      @if (ins.estado === 'ACTIVA') {
+                        <button class="btn-action btn-qr" (click)="abrirPaseDigital(ins)" title="Ver Pase Digital QR Criptográfico">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 3px;">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                          </svg>
+                          Pase QR
+                        </button>
+                        <button class="btn-action btn-freeze" (click)="toggleEstadoInscripcion(ins)" title="Congelar temporalmente">
+                          Congelar
+                        </button>
+                      }
+                      @if (ins.estado === 'CONGELADA') {
+                        <button class="btn-action btn-reactivate" (click)="toggleEstadoInscripcion(ins)" title="Reactivar membresía">
+                          Reactivar
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty-state">
+                    No existen inscripciones registradas. Comienza matriculando un socio con el botón "Nueva Inscripción".
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- TAB 2: CAJA Y PAGOS -->
+    @if (activeTab() === 'pagos' && !isLoading()) {
+      <div class="tab-panel">
+        <div class="users-table-container">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>N° COMPROBANTE</th>
+                <th>MATRÍCULA / CLIENTE</th>
+                <th>MÉTODO DE PAGO</th>
+                <th>SUBTOTAL</th>
+                <th>DESCUENTO</th>
+                <th>TOTAL</th>
+                <th>ESTADO</th>
+                <th>ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (ins of inscripciones(); track ins.id) {
+                @if (ins.boletaPago) {
+                  <tr>
+                    <td>
+                      <span class="code-badge">{{ ins.boletaPago.numeroComprobante }}</span>
+                    </td>
+                    <td>
+                      <div>
+                        <strong>{{ ins.codigoMatricula }}</strong>
+                        <div class="text-xs text-muted">{{ ins.clienteId | slice:0:13 }}...</div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="payment-badge">{{ ins.boletaPago.metodoPago }}</span>
+                    </td>
+                    <td>{{ ins.boletaPago.montoSubtotal }} BOB</td>
+                    <td>{{ ins.boletaPago.montoDescuento }} BOB</td>
+                    <td>
+                      <span class="font-bold text-accent">{{ ins.boletaPago.montoTotal }} BOB</span>
+                    </td>
+                    <td>
+                      <span class="badge" [class]="'badge-' + ins.boletaPago.estado.toLowerCase()">
+                        {{ ins.boletaPago.estado }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (ins.boletaPago.estado === 'PENDIENTE') {
+                        <button class="btn-action btn-pay" (click)="abrirModalConfirmarPago(ins.boletaPago)">
+                          Confirmar Pago
+                        </button>
+                      } @else {
+                        <span class="text-xs text-muted">
+                          {{ ins.boletaPago.codigoTransaccionExterna || 'Validado' }}
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    <!-- TAB 3: PLANES Y TARIFARIO -->
+    @if (activeTab() === 'planes' && !isLoading()) {
+      <div class="tab-panel">
+        <div class="cards-grid">
+          @for (p of planes(); track p.id) {
+            <div class="plan-card">
+              <div class="plan-header">
+                <span class="code-badge">{{ p.codigo }}</span>
+                <span class="badge badge-activa">{{ p.tipoAcceso }}</span>
+              </div>
+              <h3 class="plan-title">{{ p.nombre }}</h3>
+              <p class="plan-desc">{{ p.descripcion || 'Sin descripción detallada.' }}</p>
+
+              <div class="plan-specs">
+                <div class="spec-item">
+                  <span class="spec-label">Duración</span>
+                  <span class="spec-val">{{ p.duracionDias }} Días</span>
+                </div>
+                <div class="spec-item">
+                  <span class="spec-label">Modalidad</span>
+                  <span class="spec-val">
+                    {{ p.sesionesTotales ? p.sesionesTotales + ' Sesiones' : 'Ilimitado' }}
+                  </span>
+                </div>
+              </div>
+
+              @if (puedeEditarCatalogo()) {
+                <div class="card-action-bar">
+                  <button type="button" class="btn-card-action btn-edit" (click)="abrirModalEditarPlan(p)" title="Editar Plan">
+                    Editar
+                  </button>
+                  <button type="button" class="btn-card-action btn-tarifa" (click)="abrirModalCrearTarifa(p)" title="Nueva Tarifa">
+                    + Tarifa
+                  </button>
+                  <button type="button" class="btn-card-action btn-delete" (click)="abrirModalEliminarPlan(p)" title="Eliminar / Desactivar Plan">
+                    Eliminar
+                  </button>
+                </div>
+              } @else {
+                <div style="margin: 0.5rem 0; padding: 0.3rem 0.6rem; background: rgba(144, 171, 139, 0.1); border: 1px solid rgba(144, 171, 139, 0.2); border-radius: 4px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <span style="font-size: 0.72rem; color: #90ab8b; font-weight: 600;">Solo Consulta • Tarifario Vigente</span>
+                </div>
+              }
+
+              <div class="tarifas-section">
+                <div class="text-xs font-semibold uppercase text-muted mb-2">Tarifas Disponibles</div>
+                @for (t of p.tarifas; track t.id) {
+                  <div class="tarifa-box">
+                    <div style="display: flex; flex-direction: column;">
+                      <span class="tarifa-name">{{ t.nombre }}</span>
+                      <span class="text-xs text-muted" style="font-size: 0.72rem;">Matrícula: {{ t.matriculaInscripcion || 0 }} {{ t.moneda }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <span class="tarifa-price">{{ t.monto }} {{ t.moneda }}</span>
+                      @if (puedeEditarCatalogo()) {
+                        <div class="tarifa-mini-actions">
+                          <button type="button" class="btn-mini-icon" (click)="abrirModalEditarTarifa(t, p)" title="Editar precio">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                          </button>
+                          <button type="button" class="btn-mini-icon text-error" (click)="abrirModalEliminarTarifa(t, p)" title="Eliminar tarifa">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                } @empty {
+                  <span class="text-xs text-muted">Sin tarifas configuradas</span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- TAB 4: DISCIPLINAS Y HORARIOS -->
+    @if (activeTab() === 'disciplinas' && !isLoading()) {
+      <div class="tab-panel">
+        <div class="cards-grid">
+          @for (d of disciplinas(); track d.id) {
+            <div class="disciplina-card" [style.border-top-color]="d.colorHex || '#3B82F6'">
+              <div class="card-head">
+                <span class="color-pill" [style.background-color]="d.colorHex || '#3B82F6'"></span>
+                <span class="code-badge">{{ d.codigo }}</span>
+              </div>
+              <h3 class="disciplina-title">{{ d.nombre }}</h3>
+              <p class="disciplina-desc">{{ d.descripcion || 'Sin descripción' }}</p>
+
+              @if (puedeEditarCatalogo()) {
+                <div class="card-action-bar">
+                  <button type="button" class="btn-card-action btn-edit" (click)="abrirModalEditarDisciplina(d)" title="Editar Disciplina">
+                    Editar
+                  </button>
+                  <button type="button" class="btn-card-action btn-horarios" (click)="abrirModalGestionHorarios(d)" title="Cambiar y Gestionar Horarios">
+                    Horarios
+                  </button>
+                  <button type="button" class="btn-card-action btn-aforo" (click)="abrirModalAforo(d)" title="Ajustar Aforo y Cupos">
+                    Aforo
+                  </button>
+                  <button type="button" class="btn-card-action btn-delete" (click)="abrirModalEliminarDisciplina(d)" title="Eliminar / Archivar Disciplina">
+                    Eliminar
+                  </button>
+                </div>
+              } @else {
+                <div style="margin: 0.5rem 0; padding: 0.3rem 0.6rem; background: rgba(144, 171, 139, 0.1); border: 1px solid rgba(144, 171, 139, 0.2); border-radius: 4px; display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <span style="font-size: 0.72rem; color: #90ab8b; font-weight: 600;">Solo Consulta • Aforo Informativo</span>
+                </div>
+              }
+
+              <div class="disciplina-meta">
+                <span class="meta-label">Aforo máximo general:</span>
+                <span class="meta-val font-semibold" style="color: #6ee7b7;">{{ d.capacidadMaxima }} Personas</span>
+              </div>
+
+              <div class="horarios-list">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <span class="text-xs font-semibold text-muted uppercase">Turnos Asignados</span>
+                  @if (puedeEditarCatalogo()) {
+                    <button type="button" class="btn-link-action" (click)="abrirModalGestionHorarios(d)" title="Modificar o agregar horarios">
+                      Cambiar
+                    </button>
+                  }
+                </div>
+                @for (h of d.horarios; track h.id) {
+                  <div
+                    class="horario-pill"
+                    [class.clickable]="puedeEditarCatalogo()"
+                    (click)="puedeEditarCatalogo() ? abrirModalGestionHorarios(d) : null"
+                    [title]="puedeEditarCatalogo() ? 'Clic para cambiar o editar este horario' : 'Turno programado'"
+                  >
+                    <span>{{ h.horario?.diaSemana }} • {{ h.horario?.horaInicio }} - {{ h.horario?.horaFin }}</span>
+                    <span class="cupo-badge">{{ h.cupoDisponible }} cupos</span>
+                  </div>
+                } @empty {
+                  <div
+                    class="horario-pill empty"
+                    [class.clickable]="puedeEditarCatalogo()"
+                    (click)="puedeEditarCatalogo() ? abrirModalGestionHorarios(d) : null"
+                    [title]="puedeEditarCatalogo() ? 'Clic para asignar un horario' : 'Sin turno fijo'"
+                  >
+                    <span class="text-xs text-muted">{{ puedeEditarCatalogo() ? 'Acceso libre / Sin turno fijo (+ Asignar)' : 'Acceso libre / Sin turno fijo' }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- TAB 5: SIMULADOR Y AUDITORÍA DE TORNIQUETE -->
+    @if (activeTab() === 'torniquete' && !isLoading()) {
+      <div class="tab-panel torniquete-wrapper">
+        <!-- Barra de Subpestañas -->
+        <div class="subtabs-bar">
+          <button
+            type="button"
+            class="subtab-btn"
+            [class.active]="subTabTorniquete() === 'consola'"
+            (click)="subTabTorniquete.set('consola')"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Consola & Escáner
+            <span class="subtab-dot online"></span>
+          </button>
+
+          <button
+            type="button"
+            class="subtab-btn"
+            [class.active]="subTabTorniquete() === 'auditoria'"
+            (click)="subTabTorniquete.set('auditoria')"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Auditoría en Tiempo Real
+            <span class="subtab-badge">{{ accesos().length }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="subtab-btn subtab-btn-split"
+            [class.active]="subTabTorniquete() === 'dividida'"
+            (click)="subTabTorniquete.set('dividida')"
+            title="Ver Consola y Auditoría en pantalla dividida simultánea"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="12" y1="3" x2="12" y2="21"></line>
+            </svg>
+            Vista Dividida
+          </button>
+        </div>
+
+        <div class="torniquete-layout" [class.single-pane]="subTabTorniquete() !== 'dividida'">
+          @if (subTabTorniquete() === 'consola' || subTabTorniquete() === 'dividida') {
+            <!-- Panel Izquierdo: Consola del Torniquete -->
+            <div class="torniquete-console" [class.full-view]="subTabTorniquete() === 'consola'">
+          <div class="console-head">
+            <div class="torniquete-status-indicator online"></div>
+            <div>
+              <h3 class="console-title">Torniquete Físico #01 (Acceso Principal)</h3>
+              <span class="text-xs text-muted">Modo ultra-rápido (< 50ms) con validación atómica de membresía</span>
+            </div>
+          </div>
+
+          <div class="torniquete-mode-selector">
+            <button
+              type="button"
+              class="mode-btn"
+              [class.active]="modoTorniquete() === 'qr'"
+              (click)="toggleModoTorniquete('qr')"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 5px;">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              Escáner QR Cámara en Vivo
+            </button>
+            <button
+              type="button"
+              class="mode-btn"
+              [class.active]="modoTorniquete() === 'manual'"
+              (click)="toggleModoTorniquete('manual')"
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 5px;">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              Manual / Tarjeta RFID
+            </button>
+          </div>
+
+          <div class="form-group mt-3">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="margin-bottom: 0; font-weight: 600;">Tipo de Movimiento</label>
+              <span
+                class="badge"
+                [style.background]="torniqueteForm.tipoMovimiento === 'AUTO' ? 'rgba(99, 102, 241, 0.2)' : (torniqueteForm.tipoMovimiento === 'ENTRADA' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)')"
+                [style.color]="torniqueteForm.tipoMovimiento === 'AUTO' ? '#a5b4fc' : (torniqueteForm.tipoMovimiento === 'ENTRADA' ? '#6ee7b7' : '#fca5a5')"
+                [style.border]="torniqueteForm.tipoMovimiento === 'AUTO' ? '1px solid rgba(99, 102, 241, 0.4)' : (torniqueteForm.tipoMovimiento === 'ENTRADA' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)')"
+                style="padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;"
+              >
+                {{ torniqueteForm.tipoMovimiento === 'AUTO' ? 'Modo Alternado Automático' : (torniqueteForm.tipoMovimiento === 'ENTRADA' ? 'Modo Entrada Fija' : 'Modo Salida Fija') }}
+              </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <select class="form-control" [(ngModel)]="torniqueteForm.tipoMovimiento" style="flex: 1;">
+                <option value="AUTO">AUTO (Alternar Entrada ⇄ Salida según estado del socio)</option>
+                <option value="ENTRADA">ENTRADA (Ingreso a sala de pesas / clase)</option>
+                <option value="SALIDA">SALIDA (Registro de egreso)</option>
+              </select>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                (click)="alternarTipoMovimiento()"
+                title="Alternar manualmente Entrada ⇄ Salida"
+                style="padding: 0 14px; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;"
+              >
+                Alternar
+              </button>
+            </div>
+            <small style="display: block; margin-top: 6px; color: var(--text-muted); font-size: 0.78rem;">
+              En <strong>AUTO</strong>, si el socio está afuera ingresará (<strong>ENTRADA</strong>), y si ya está adentro se registrará su egreso (<strong>SALIDA</strong>).
+            </small>
+          </div>
+
+          @if (modoTorniquete() === 'qr') {
+            <div class="qr-scanner-card">
+              <!-- Notificación Dinámica de Estado del QR: analizando, valido, invalido, no_analizable -->
+              @if (qrNotificacionEstado() !== 'idle') {
+                <div
+                  class="qr-notification-banner"
+                  [class.state-analizando]="qrNotificacionEstado() === 'analizando'"
+                  [class.state-valido]="qrNotificacionEstado() === 'valido'"
+                  [class.state-invalido]="qrNotificacionEstado() === 'invalido'"
+                  [class.state-no-analizable]="qrNotificacionEstado() === 'no_analizable'"
+                  role="alert"
+                >
+                  <div class="qr-notif-icon-col">
+                    @if (qrNotificacionEstado() === 'analizando') {
+                      <div class="qr-spinner"></div>
+                    } @else if (qrNotificacionEstado() === 'valido') {
+                      <div class="qr-icon-circle icon-valido">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      </div>
+                    } @else if (qrNotificacionEstado() === 'invalido') {
+                      <div class="qr-icon-circle icon-invalido">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </div>
+                    } @else if (qrNotificacionEstado() === 'no_analizable') {
+                      <div class="qr-icon-circle icon-no-analizable">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                          <line x1="12" y1="9" x2="12" y2="13"></line>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="qr-notif-text-col">
+                    <div class="qr-notif-title-row">
+                      <span class="qr-notif-badge">
+                        @if (qrNotificacionEstado() === 'analizando') { ANALIZANDO }
+                        @else if (qrNotificacionEstado() === 'valido') { VÁLIDO }
+                        @else if (qrNotificacionEstado() === 'invalido') { NO VÁLIDO }
+                        @else if (qrNotificacionEstado() === 'no_analizable') { NO ANALIZABLE }
+                      </span>
+                      <strong class="qr-notif-title">{{ qrNotificacionTitulo() }}</strong>
+                    </div>
+                    @if (qrNotificacionDetalle()) {
+                      <p class="qr-notif-detail">{{ qrNotificacionDetalle() }}</p>
+                    }
+                  </div>
+
+                  <button
+                    type="button"
+                    class="qr-notif-close"
+                    (click)="cerrarNotificacionQr()"
+                    title="Cerrar notificación"
+                  >
+                    &times;
+                  </button>
+                </div>
+              }
+
+              <div class="qr-camera-wrapper">
+                <div id="torniquete-camera-reader" style="width: 100%; border-radius: 8px; overflow: hidden; background: #0c1419;"></div>
+                @if (!camaraActiva()) {
+                  <div class="camera-idle-placeholder">
+                    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#6ee7b7" stroke-width="1.8" style="margin-bottom: 0.35rem; opacity: 0.85;">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <p style="margin: 0 0 0.5rem 0; color: #9bb0a5; font-size: 0.8rem;">
+                      Cámara del torniquete en reposo
+                    </p>
+                    <button type="button" class="btn btn-primary btn-sm" (click)="iniciarCamara()">
+                      Activar Cámara de Garita
+                    </button>
+                  </div>
+                }
+              </div>
+
+              @if (camaraActiva()) {
+                <div class="camera-active-controls">
+                  <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                    <span class="live-badge">LECTURA EN TIEMPO REAL ACTIVA</span>
+                    @if (dispositivosCamara().length > 1) {
+                      <select
+                        class="form-control form-control-sm"
+                        style="max-width: 180px; font-size: 0.72rem; padding: 0.15rem 0.4rem; height: auto;"
+                        [ngModel]="camaraSeleccionadaId()"
+                        (ngModelChange)="cambiarCamara($event)"
+                      >
+                        @for (cam of dispositivosCamara(); track cam.id) {
+                          <option [value]="cam.id">{{ cam.label }}</option>
+                        }
+                      </select>
+                    }
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" (click)="detenerCamara()">
+                    Detener Cámara
+                  </button>
+                </div>
+              }
+
+              <!-- Barra de Herramientas de Auxilio y Pruebas Rápidas de Estados -->
+              <div class="qr-aux-toolbar">
+                <input
+                  type="file"
+                  #qrFileInput
+                  accept="image/*"
+                  style="display: none"
+                  (change)="escanearArchivoQr($event)"
+                />
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  (click)="qrFileInput.click()"
+                  title="Cargar y analizar imagen de un código QR"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px; margin-right: 4px;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  Subir Foto QR
+                </button>
+
+                <div class="qr-test-chips">
+                  <span class="qr-test-label">Simulador:</span>
+                  <button
+                    type="button"
+                    class="btn-test-qr test-valido"
+                    (click)="simularPruebaQr('valido')"
+                    title="Simular lectura de QR Válido con membresía"
+                  >
+                    Válido
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-test-qr test-invalido"
+                    (click)="simularPruebaQr('invalido')"
+                    title="Simular lectura de QR Adulterado o No Válido"
+                  >
+                    No Válido
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-test-qr test-no-analizable"
+                    (click)="simularPruebaQr('no_analizable')"
+                    title="Simular lectura de código corrupto que no se puede analizar"
+                  >
+                    No Analizable
+                  </button>
+                </div>
+
+                <div class="qr-manual-test-row" style="display: flex; gap: 0.5rem; width: 100%; margin-top: 0.4rem;">
+                  <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    [(ngModel)]="codigoQrManual"
+                    placeholder="Pegar código o token QR para validar..."
+                    style="flex: 1; font-size: 0.78rem;"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    (click)="procesarQrManual()"
+                    [disabled]="!codigoQrManual.trim()"
+                  >
+                    Validar
+                  </button>
+                </div>
+              </div>
+
+              @if (camaraError()) {
+                <div class="camera-error-alert">
+                  {{ camaraError() }}
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="form-group mt-3">
+              <label>Socio / Tarjeta RFID a Validar *</label>
+              <select class="form-control" [(ngModel)]="torniqueteForm.clienteId">
+                @for (c of clientes(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.nombre }} {{ c.apellido }} — CI: {{ c.ci }} ({{ c.codigo }})
+                  </option>
+                }
+              </select>
+              <div class="quick-pick">
+                <span class="text-xs text-muted">Matrículas emitidas:</span>
+                @for (ins of inscripciones() | slice:0:3; track ins.id) {
+                  <button
+                    type="button"
+                    class="btn-chip"
+                    (click)="torniqueteForm.clienteId = ins.clienteId"
+                  >
+                    {{ ins.codigoMatricula }} ({{ obtenerNombreCliente(ins.clienteId) | slice:0:15 }})
+                  </button>
+                }
+              </div>
+            </div>
+
+            <button
+              class="btn btn-primary btn-block btn-lg"
+              (click)="ejecutarPasoTorniquete()"
+              [disabled]="isLoading()"
+            >
+              Validar y Aperturar Torniquete
+            </button>
+          }
+
+          <!-- Display de Respuesta del Torniquete -->
+          @if (torniqueteResult(); as res) {
+            <div
+              class="torniquete-display"
+              [class.display-granted]="res.permitido"
+              [class.display-denied]="!res.permitido"
+            >
+              <div class="display-icon">
+                @if (res.permitido) {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                } @else {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                }
+              </div>
+
+              <div class="display-content">
+                <h4 class="display-headline">
+                  {{ res.permitido ? 'PASO PERMITIDO' : 'ACCESO DENEGADO' }}
+                </h4>
+                <p class="display-sub">{{ res.mensaje }}</p>
+
+                @if (res.permitido) {
+                  <div class="display-details">
+                    <div><strong>Matrícula:</strong> {{ res.codigoMatricula }}</div>
+                    <div><strong>Plan:</strong> {{ res.planNombre }}</div>
+                    @if (res.diasRestantes !== undefined) {
+                      <div><strong>Días de vigencia:</strong> {{ res.diasRestantes }} días</div>
+                    }
+                    @if (res.sesionesRestantes !== undefined && res.sesionesRestantes !== null) {
+                      <div><strong>Sesiones disponibles:</strong> {{ res.sesionesRestantes }}</div>
+                    }
+                  </div>
+                } @else {
+                  <div class="display-details-error">
+                    <strong>Motivo:</strong> {{ res.registroAcceso.motivoDenegacion }}
+                  </div>
+                }
+              </div>
+            </div>
+          }
+            </div>
+          }
+
+          @if (subTabTorniquete() === 'auditoria' || subTabTorniquete() === 'dividida') {
+            <!-- Panel Auditoría de Accesos -->
+            <div class="auditoria-panel" [class.full-view]="subTabTorniquete() === 'auditoria'">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h3 class="panel-title" style="margin: 0;">
+                  <span class="status-dot" style="display: inline-block;"></span>
+                  Auditoría en Tiempo Real de Accesos
+                </h3>
+                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem; padding: 2px 8px;">
+                  En Vivo ({{ accesos().length }} eventos)
+                </span>
+              </div>
+              <p class="panel-subtitle">Registro cronológico de torniquetes con marcas de tiempo precisas.</p>
+
+              <div class="users-table-container">
+                <table class="users-table">
+                  <thead>
+                    <tr>
+                      <th>HORA</th>
+                      <th>MOVIMIENTO</th>
+                      <th>ESTADO</th>
+                      <th>SOCIO</th>
+                      <th>DETALLE / MOTIVO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (a of accesos(); track a.id) {
+                      <tr>
+                        <td>{{ a.fechaHora | date:'HH:mm:ss' }}</td>
+                        <td>
+                          <span class="badge-mini" [class.mini-entrada]="a.tipoMovimiento === 'ENTRADA'" [class.mini-salida]="a.tipoMovimiento === 'SALIDA'">
+                            {{ a.tipoMovimiento }}
+                          </span>
+                        </td>
+                        <td>
+                          <span class="badge" [class.badge-activa]="a.estadoAcceso === 'PERMITIDO'" [class.badge-vencida]="a.estadoAcceso === 'DENEGADO'">
+                            {{ a.estadoAcceso }}
+                          </span>
+                        </td>
+                        <td>
+                          <span class="font-medium text-xs text-light">
+                            {{ obtenerNombreCliente(a.clienteId) }}
+                          </span>
+                        </td>
+                        <td>
+                          <span class="text-xs" [class.text-error]="a.motivoDenegacion">
+                            {{ a.motivoDenegacion || 'Acceso regular concedido' }}
+                          </span>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="empty-state">Sin eventos de torniquete registrados aún.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </main>
+
+  <!-- MODAL: NUEVA INSCRIPCIÓN -->
+  @if (showInscripcionModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Procesar Nueva Inscripción</h3>
+          <button class="modal-close" (click)="showInscripcionModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <label style="margin: 0; font-weight: 600;">Socio / Cliente a Inscribir *</label>
+              <button
+                type="button"
+                (click)="toggleModoManualCliente()"
+                style="background: transparent; border: none; color: #6ee7b7; font-size: 0.78rem; text-decoration: underline; cursor: pointer; padding: 0;"
+              >
+                {{ modoManualCliente() ? '← Volver a lista desplegable' : 'Ingresar UUID/CI manual' }}
+              </button>
+            </div>
+
+            @if (!modoManualCliente()) {
+              <select class="form-control" [(ngModel)]="nuevaInscripcion.clienteId" required>
+                <option value="" disabled selected>-- Seleccione un socio registrado --</option>
+                @for (c of clientes(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.nombre }} {{ c.apellido }} — CI: {{ c.ci }} ({{ c.codigo }})
+                  </option>
+                }
+              </select>
+            } @else {
+              <input
+                type="text"
+                class="form-control"
+                placeholder="Pegar UUID de socio o CI"
+                [(ngModel)]="nuevaInscripcion.clienteId"
+                required
+              />
+              <span style="font-size: 0.72rem; color: #9bb0a5; margin-top: 0.25rem; display: block;">
+                Modo manual de emergencia activado.
+              </span>
+            }
+          </div>
+
+          <div class="form-group">
+            <label>Plan de Entrenamiento *</label>
+            <select class="form-control" [(ngModel)]="nuevaInscripcion.planId" (change)="onPlanSeleccionado()">
+              @for (p of planes(); track p.id) {
+                <option [value]="p.id">{{ p.nombre }} ({{ p.duracionDias }} días)</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Tarifa / Precio *</label>
+            <select class="form-control" [(ngModel)]="nuevaInscripcion.tarifaId">
+              @for (p of planes(); track p.id) {
+                @if (p.id === nuevaInscripcion.planId) {
+                  @for (t of p.tarifas; track t.id) {
+                    <option [value]="t.id">{{ t.nombre }} - {{ t.monto }} {{ t.moneda }} (Matrícula: {{ t.matriculaInscripcion }} {{ t.moneda }})</option>
+                  }
+                }
+              }
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Disciplina / Especialidad</label>
+              <select class="form-control" [(ngModel)]="nuevaInscripcion.disciplinaId" (change)="onDisciplinaSeleccionada()">
+                <option value="">-- Sin disciplina específica / Libre --</option>
+                @for (d of disciplinas(); track d.id) {
+                  <option [value]="d.id">{{ d.nombre }} (Aforo: {{ d.capacidadMaxima }})</option>
+                }
+              </select>
+            </div>
+
+            @if (getHorariosDisciplinaSeleccionada().length > 0) {
+              <div class="form-group col">
+                <label>Horario Asignado</label>
+                <select class="form-control" [(ngModel)]="nuevaInscripcion.disciplinaHorarioId">
+                  <option value="">-- Sin horario fijo asignado --</option>
+                  @for (dh of getHorariosDisciplinaSeleccionada(); track dh.id) {
+                    <option [value]="dh.id">
+                      {{ dh.horario?.diaSemana }} {{ dh.horario?.horaInicio }} - {{ dh.horario?.horaFin }} (Cupos: {{ dh.cupoDisponible }})
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Fecha de Inicio *</label>
+              <input type="date" class="form-control" [(ngModel)]="nuevaInscripcion.fechaInicio" />
+            </div>
+
+            <div class="form-group col">
+              <label>Método de Pago (Patrón Estrategia) *</label>
+              <select class="form-control" [(ngModel)]="nuevaInscripcion.metodoPago" (change)="onMetodoPagoInscripcionChanged()">
+                <option value="EFECTIVO">Efectivo en Caja</option>
+                <option value="QR">QR Simple Interbancario</option>
+                <option value="TARJETA">Tarjeta (Stripe Gateway)</option>
+                <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ==================== ESTRATEGIA 1: EFECTIVO ==================== -->
+          @if (nuevaInscripcion.metodoPago === 'EFECTIVO') {
+            <div class="strategy-panel strategy-efectivo">
+              <div class="strategy-header">
+                <span class="strategy-badge badge-efectivo">ESTRATEGIA: EFECTIVO</span>
+                <span class="strategy-hint">Solo se requiere ingresar el monto entregado en caja</span>
+              </div>
+
+              <div class="form-group">
+                <label>Monto Recibido del Socio (BOB) *</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">Bs.</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    class="form-control font-semibold"
+                    placeholder="0.00"
+                    [(ngModel)]="pagoEstrategia.montoRecibido"
+                  />
+                </div>
+              </div>
+
+              <!-- Botones rápidos de caja -->
+              <div class="quick-cash-row">
+                <span class="text-xs text-muted">Accesos rápidos:</span>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(0, 'inscripcion')">
+                  Importe Exacto ({{ getMontoTotalInscripcion() }} Bs)
+                </button>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(100, 'inscripcion')">100 Bs</button>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(200, 'inscripcion')">200 Bs</button>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(500, 'inscripcion')">500 Bs</button>
+              </div>
+
+              <!-- Tarjeta de cálculo en vivo de cambio -->
+              <div class="cambio-summary-card" [class.cambio-insuficiente]="(pagoEstrategia.montoRecibido || 0) < getMontoTotalInscripcion()">
+                <div class="cambio-item">
+                  <span class="cambio-label">Total a Pagar</span>
+                  <span class="cambio-val">{{ getMontoTotalInscripcion() | number:'1.2-2' }} BOB</span>
+                </div>
+                <div class="cambio-sep">-</div>
+                <div class="cambio-item">
+                  <span class="cambio-label">Entregado</span>
+                  <span class="cambio-val">{{ (pagoEstrategia.montoRecibido || 0) | number:'1.2-2' }} BOB</span>
+                </div>
+                <div class="cambio-sep">=</div>
+                <div class="cambio-item cambio-highlight">
+                  <span class="cambio-label">Cambio a Devolver</span>
+                  @if ((pagoEstrategia.montoRecibido || 0) >= getMontoTotalInscripcion()) {
+                    <span class="cambio-val text-success">
+                      {{ getCambioEfectivoInscripcion() | number:'1.2-2' }} BOB
+                    </span>
+                  } @else {
+                    <span class="cambio-val text-error">
+                      Faltan {{ (getMontoTotalInscripcion() - (pagoEstrategia.montoRecibido || 0)) | number:'1.2-2' }} BOB
+                    </span>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- ==================== ESTRATEGIA 2: QR SIMPLE ==================== -->
+          @if (nuevaInscripcion.metodoPago === 'QR') {
+            <div class="strategy-panel strategy-qr">
+              <div class="strategy-header">
+                <span class="strategy-badge badge-qr">ESTRATEGIA: QR SIMPLE</span>
+                <span class="strategy-hint">Requiere comprobante de pago digital obligatorio</span>
+              </div>
+
+              <div class="qr-layout">
+                <!-- QR Visual ApexFitness -->
+                <div class="qr-preview-box">
+                  <div class="qr-code-art">
+                    <svg viewBox="0 0 100 100" class="qr-svg">
+                      <rect width="100" height="100" fill="#162026" rx="8" />
+                      <!-- QR Pattern blocks -->
+                      <rect x="10" y="10" width="28" height="28" fill="#ebf4dd" rx="4" />
+                      <rect x="15" y="15" width="18" height="18" fill="#162026" rx="2" />
+                      <rect x="19" y="19" width="10" height="10" fill="#6ee7b7" rx="1" />
+
+                      <rect x="62" y="10" width="28" height="28" fill="#ebf4dd" rx="4" />
+                      <rect x="67" y="15" width="18" height="18" fill="#162026" rx="2" />
+                      <rect x="71" y="19" width="10" height="10" fill="#6ee7b7" rx="1" />
+
+                      <rect x="10" y="62" width="28" height="28" fill="#ebf4dd" rx="4" />
+                      <rect x="15" y="67" width="18" height="18" fill="#162026" rx="2" />
+                      <rect x="19" y="71" width="10" height="10" fill="#6ee7b7" rx="1" />
+
+                      <!-- Data grid dots -->
+                      <rect x="44" y="12" width="6" height="6" fill="#ebf4dd" />
+                      <rect x="52" y="20" width="6" height="6" fill="#6ee7b7" />
+                      <rect x="44" y="28" width="6" height="6" fill="#ebf4dd" />
+                      <rect x="44" y="44" width="12" height="12" fill="#5a7863" rx="2" />
+                      <rect x="12" y="44" width="6" height="6" fill="#6ee7b7" />
+                      <rect x="24" y="52" width="6" height="6" fill="#ebf4dd" />
+                      <rect x="64" y="44" width="8" height="6" fill="#ebf4dd" />
+                      <rect x="76" y="52" width="8" height="8" fill="#6ee7b7" />
+                      <rect x="44" y="64" width="8" height="8" fill="#ebf4dd" />
+                      <rect x="64" y="68" width="8" height="8" fill="#6ee7b7" />
+                      <rect x="76" y="76" width="14" height="14" fill="#ebf4dd" rx="2" />
+                    </svg>
+                    <span class="qr-amount-badge">Total: {{ getMontoTotalInscripcion() }} BOB</span>
+                  </div>
+                  <span class="text-xs text-muted">Escanee desde cualquier app bancaria</span>
+                </div>
+
+                <!-- Subida de Comprobante Obligatorio -->
+                <div class="qr-upload-box">
+                  <label class="font-semibold text-sm" style="color: #ebf4dd; display: block; margin-bottom: 0.4rem;">
+                    Subir Comprobante de Transferencia *
+                  </label>
+
+                  @if (!pagoEstrategia.comprobantePreview) {
+                    <div class="upload-dropzone">
+                      <input
+                        type="file"
+                        id="qrComprobanteInput"
+                        class="dropzone-file-input"
+                        accept="image/*,.pdf"
+                        (change)="onComprobanteFileSelected($event)"
+                      />
+                      <label for="qrComprobanteInput" class="dropzone-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="upload-icon">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="17 8 12 3 7 8"></polyline>
+                          <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <span class="font-semibold text-sm">Examinar comprobante o foto...</span>
+                        <span class="text-xs text-muted">Formatos: JPG, PNG, WEBP o PDF</span>
+                      </label>
+                    </div>
+                  } @else {
+                    <div class="comprobante-preview-card">
+                      <img [src]="pagoEstrategia.comprobantePreview" alt="Comprobante" class="comprobante-thumb" />
+                      <div class="comprobante-info">
+                        <span class="comprobante-name">{{ pagoEstrategia.comprobanteNombre || 'comprobante_qr.png' }}</span>
+                        <span class="text-xs text-success">Archivo cargado correctamente</span>
+                        <button type="button" class="btn-remove-file" (click)="removerComprobante()">
+                          Cambiar o quitar archivo
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                  <div class="form-group" style="margin-top: 0.75rem;">
+                    <label class="text-xs text-muted">Código de Operación Bancaria (Opcional)</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      placeholder="Ej: BCP-9928182"
+                      [(ngModel)]="pagoEstrategia.codigoTransaccionQr"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- ==================== ESTRATEGIA 3: STRIPE (TARJETA) ==================== -->
+          @if (nuevaInscripcion.metodoPago === 'TARJETA') {
+            <div class="strategy-panel strategy-stripe">
+              <div class="strategy-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="strategy-badge badge-stripe">ESTRATEGIA: STRIPE GATEWAY</span>
+                  <span class="stripe-badge-secure">Cifrado TLS 256-bit</span>
+                </div>
+                <button type="button" class="btn-test-card" (click)="llenarTarjetaPruebaStripe()">
+                  Rellenar tarjeta de prueba Stripe
+                </button>
+              </div>
+
+              <!-- Stripe Elements Card UI -->
+              <div class="stripe-card-form">
+                <div class="form-group">
+                  <label class="text-xs font-semibold">Número de Tarjeta *</label>
+                  <div class="stripe-input-wrapper">
+                    <input
+                      type="text"
+                      class="form-control font-mono"
+                      placeholder="4242 4242 4242 4242"
+                      maxlength="19"
+                      [(ngModel)]="pagoEstrategia.numeroTarjeta"
+                      (input)="formatearTarjeta($event)"
+                    />
+                    <div class="card-brands">
+                      <span class="brand-badge brand-visa">VISA</span>
+                      <span class="brand-badge brand-mc">MC</span>
+                      <span class="brand-badge brand-amex">AMEX</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group col">
+                    <label class="text-xs font-semibold">Expiración (Mes / Año) *</label>
+                    <div style="display: flex; gap: 0.35rem;">
+                      <select class="form-control" [(ngModel)]="pagoEstrategia.expiracionMes">
+                        <option value="01">01</option><option value="02">02</option>
+                        <option value="03">03</option><option value="04">04</option>
+                        <option value="05">05</option><option value="06">06</option>
+                        <option value="07">07</option><option value="08">08</option>
+                        <option value="09">09</option><option value="10">10</option>
+                        <option value="11">11</option><option value="12">12</option>
+                      </select>
+                      <select class="form-control" [(ngModel)]="pagoEstrategia.expiracionAnio">
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                        <option value="2029">2029</option>
+                        <option value="2030">2030</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="form-group col">
+                    <label class="text-xs font-semibold">CVC / CVV *</label>
+                    <input
+                      type="password"
+                      class="form-control font-mono"
+                      placeholder="•••"
+                      maxlength="4"
+                      [(ngModel)]="pagoEstrategia.cvc"
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="text-xs font-semibold">Nombre del Titular de la Tarjeta *</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Ej: JUAN PEREZ"
+                    [(ngModel)]="pagoEstrategia.titular"
+                  />
+                </div>
+              </div>
+
+              <div class="stripe-footer-note">
+                <span class="text-xs text-muted">
+                  Transacción protegida y auditada por Stripe Payments. Al confirmar, se emitirá el PaymentIntent correspondiente.
+                </span>
+              </div>
+            </div>
+          }
+
+          <!-- ==================== ESTRATEGIA 4: TRANSFERENCIA ==================== -->
+          @if (nuevaInscripcion.metodoPago === 'TRANSFERENCIA') {
+            <div class="strategy-panel">
+              <div class="form-group">
+                <label>Código Comprobante Bancario / Transacción *</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Ej: TRF-BNB-998822"
+                  [(ngModel)]="nuevaInscripcion.codigoTransaccionExterna"
+                />
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showInscripcionModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarInscripcion()" [disabled]="isLoading()">
+            Emitir Matrícula y Procesar Pago
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: CONFIRMAR PAGO (APLICA TAMBIÉN EL PATRÓN ESTRATEGIA) -->
+  @if (showPagoModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Confirmar Cobro de Boleta (Patrón Estrategia)</h3>
+          <button class="modal-close" (click)="showPagoModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="pago-invoice-preview">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span class="text-xs text-muted">Boleta N°:</span>
+                <span class="font-mono font-semibold" style="color: #6ee7b7; margin-left: 0.35rem;">
+                  {{ selectedBoletaPago()?.numeroComprobante }}
+                </span>
+              </div>
+              <div>
+                <span class="text-xs text-muted">Monto Total:</span>
+                <span class="font-semibold text-lg" style="color: #ebf4dd; margin-left: 0.35rem;">
+                  {{ selectedBoletaPago()?.montoTotal }} BOB
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selector de Método / Estrategia para Confirmar -->
+          <div class="form-group" style="margin-top: 1rem;">
+            <label>Método de Pago *</label>
+            <select class="form-control" [(ngModel)]="metodoPagoConfirmacion" (change)="onMetodoPagoConfirmacionChanged()">
+              <option value="EFECTIVO">Efectivo en Caja</option>
+              <option value="QR">QR Simple Interbancario</option>
+              <option value="TARJETA">Tarjeta (Stripe Gateway)</option>
+              <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+            </select>
+          </div>
+
+          <!-- Panel Confirmación Estrategia 1: EFECTIVO -->
+          @if (metodoPagoConfirmacion() === 'EFECTIVO') {
+            <div class="strategy-panel strategy-efectivo">
+              <div class="form-group">
+                <label>Monto Recibido del Socio *</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">Bs.</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    class="form-control font-semibold"
+                    [(ngModel)]="pagoEstrategia.montoRecibido"
+                  />
+                </div>
+              </div>
+
+              <div class="quick-cash-row">
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(0, 'confirmar')">
+                  Importe Exacto ({{ selectedBoletaPago()?.montoTotal }} Bs)
+                </button>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(100, 'confirmar')">100 Bs</button>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(200, 'confirmar')">200 Bs</button>
+                <button type="button" class="btn-chip" (click)="establecerMontoEfectivoRapido(500, 'confirmar')">500 Bs</button>
+              </div>
+
+              <div class="cambio-summary-card" [class.cambio-insuficiente]="(pagoEstrategia.montoRecibido || 0) < (selectedBoletaPago()?.montoTotal || 0)">
+                <div class="cambio-item">
+                  <span class="cambio-label">Total Boleta</span>
+                  <span class="cambio-val">{{ selectedBoletaPago()?.montoTotal | number:'1.2-2' }} BOB</span>
+                </div>
+                <div class="cambio-sep">-</div>
+                <div class="cambio-item">
+                  <span class="cambio-label">Entregado</span>
+                  <span class="cambio-val">{{ (pagoEstrategia.montoRecibido || 0) | number:'1.2-2' }} BOB</span>
+                </div>
+                <div class="cambio-sep">=</div>
+                <div class="cambio-item cambio-highlight">
+                  <span class="cambio-label">Cambio a Devolver</span>
+                  @if ((pagoEstrategia.montoRecibido || 0) >= (selectedBoletaPago()?.montoTotal || 0)) {
+                    <span class="cambio-val text-success">
+                      {{ getCambioEfectivoConfirmarPago() | number:'1.2-2' }} BOB
+                    </span>
+                  } @else {
+                    <span class="cambio-val text-error">
+                      Faltan {{ ((selectedBoletaPago()?.montoTotal || 0) - (pagoEstrategia.montoRecibido || 0)) | number:'1.2-2' }} BOB
+                    </span>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Panel Confirmación Estrategia 2: QR -->
+          @if (metodoPagoConfirmacion() === 'QR') {
+            <div class="strategy-panel strategy-qr">
+              <label class="font-semibold text-sm" style="color: #ebf4dd; display: block; margin-bottom: 0.4rem;">
+                Adjuntar Comprobante de Pago QR *
+              </label>
+
+              @if (!pagoEstrategia.comprobantePreview) {
+                <div class="upload-dropzone">
+                  <input
+                    type="file"
+                    id="qrConfirmarInput"
+                    class="dropzone-file-input"
+                    accept="image/*,.pdf"
+                    (change)="onComprobanteFileSelected($event)"
+                  />
+                  <label for="qrConfirmarInput" class="dropzone-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="upload-icon">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span class="font-semibold text-sm">Examinar captura del comprobante...</span>
+                    <span class="text-xs text-muted">Formatos: JPG, PNG, WEBP</span>
+                  </label>
+                </div>
+              } @else {
+                <div class="comprobante-preview-card">
+                  <img [src]="pagoEstrategia.comprobantePreview" alt="Comprobante" class="comprobante-thumb" />
+                  <div class="comprobante-info">
+                    <span class="comprobante-name">{{ pagoEstrategia.comprobanteNombre || 'comprobante_qr.png' }}</span>
+                    <span class="text-xs text-success">Comprobante listo para validar</span>
+                    <button type="button" class="btn-remove-file" (click)="removerComprobante()">
+                      Quitar o cambiar
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <div class="form-group" style="margin-top: 0.75rem;">
+                <label class="text-xs text-muted">Código de Operación Bancaria (Opcional)</label>
+                <input
+                  type="text"
+                  class="form-control form-control-sm"
+                  placeholder="Ej: QR-BANCO-998811"
+                  [(ngModel)]="pagoEstrategia.codigoTransaccionQr"
+                />
+              </div>
+            </div>
+          }
+
+          <!-- Panel Confirmación Estrategia 3: STRIPE -->
+          @if (metodoPagoConfirmacion() === 'TARJETA') {
+            <div class="strategy-panel strategy-stripe">
+              <div class="strategy-header">
+                <span class="strategy-badge badge-stripe">Pasarela Stripe</span>
+                <button type="button" class="btn-test-card" (click)="llenarTarjetaPruebaStripe()">
+                  Usar tarjeta de prueba
+                </button>
+              </div>
+
+              <div class="stripe-card-form">
+                <div class="form-group">
+                  <label class="text-xs font-semibold">Número de Tarjeta *</label>
+                  <input
+                    type="text"
+                    class="form-control font-mono"
+                    placeholder="4242 4242 4242 4242"
+                    maxlength="19"
+                    [(ngModel)]="pagoEstrategia.numeroTarjeta"
+                    (input)="formatearTarjeta($event)"
+                  />
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group col">
+                    <label class="text-xs font-semibold">Expiración *</label>
+                    <div style="display: flex; gap: 0.35rem;">
+                      <select class="form-control" [(ngModel)]="pagoEstrategia.expiracionMes">
+                        <option value="01">01</option><option value="02">02</option>
+                        <option value="03">03</option><option value="04">04</option>
+                        <option value="05">05</option><option value="06">06</option>
+                        <option value="07">07</option><option value="08">08</option>
+                        <option value="09">09</option><option value="10">10</option>
+                        <option value="11">11</option><option value="12">12</option>
+                      </select>
+                      <select class="form-control" [(ngModel)]="pagoEstrategia.expiracionAnio">
+                        <option value="2026">2026</option><option value="2027">2027</option>
+                        <option value="2028">2028</option><option value="2029">2029</option>
+                        <option value="2030">2030</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group col">
+                    <label class="text-xs font-semibold">CVC *</label>
+                    <input
+                      type="password"
+                      class="form-control font-mono"
+                      placeholder="•••"
+                      maxlength="4"
+                      [(ngModel)]="pagoEstrategia.cvc"
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="text-xs font-semibold">Titular *</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Ej: JUAN PEREZ"
+                    [(ngModel)]="pagoEstrategia.titular"
+                  />
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Panel Confirmación Estrategia 4: TRANSFERENCIA -->
+          @if (metodoPagoConfirmacion() === 'TRANSFERENCIA') {
+            <div class="strategy-panel">
+              <div class="form-group">
+                <label>Código de Autorización Bancaria *</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Ej: TRANS-998182"
+                  [(ngModel)]="confirmarPagoForm.codigoTransaccionExterna"
+                />
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showPagoModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarConfirmarPago()" [disabled]="isLoading()">
+            Confirmar y Registrar Pago
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: CREAR DISCIPLINA -->
+  @if (showCrearDisciplinaModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Nueva Disciplina Deportiva</h3>
+          <button class="modal-close" (click)="showCrearDisciplinaModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Código *</label>
+            <input type="text" class="form-control" placeholder="Ej: DISC-FUNC" [(ngModel)]="nuevaDisciplina.codigo" />
+          </div>
+
+          <div class="form-group">
+            <label>Nombre de la Disciplina *</label>
+            <input type="text" class="form-control" placeholder="Ej: Funcional Hiit" [(ngModel)]="nuevaDisciplina.nombre" />
+          </div>
+
+          <div class="form-group">
+            <label>Descripción</label>
+            <textarea class="form-control" rows="2" [(ngModel)]="nuevaDisciplina.descripcion"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Capacidad Máxima *</label>
+              <input type="number" class="form-control" [(ngModel)]="nuevaDisciplina.capacidadMaxima" />
+            </div>
+            <div class="form-group col">
+              <label>Color Identificador</label>
+              <input type="color" class="form-control form-color" [(ngModel)]="nuevaDisciplina.colorHex" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showCrearDisciplinaModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarDisciplina()" [disabled]="isLoading()">
+            Guardar Disciplina
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: CREAR PLAN -->
+  @if (showCrearPlanModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Nuevo Plan de Suscripción</h3>
+          <button class="modal-close" (click)="showCrearPlanModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Código del Plan *</label>
+            <input type="text" class="form-control" placeholder="Ej: PLAN-SEMESTRAL" [(ngModel)]="nuevoPlan.codigo" />
+          </div>
+
+          <div class="form-group">
+            <label>Nombre del Plan *</label>
+            <input type="text" class="form-control" placeholder="Ej: Plan Semestral Gold" [(ngModel)]="nuevoPlan.nombre" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Duración (Días) *</label>
+              <input type="number" class="form-control" [(ngModel)]="nuevoPlan.duracionDias" />
+            </div>
+            <div class="form-group col">
+              <label>Tipo de Acceso</label>
+              <select class="form-control" [(ngModel)]="nuevoPlan.tipoAcceso">
+                <option value="ILIMITADO">ILIMITADO</option>
+                <option value="SESIONES">SESIONES CONTADAS</option>
+                <option value="DISCIPLINA_ESPECIFICA">DISCIPLINA ESPECÍFICA</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Precio de Tarifa Inicial (BOB)</label>
+            <input type="number" class="form-control" [(ngModel)]="nuevoPlan.precioTarifa" />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showCrearPlanModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarPlan()" [disabled]="isLoading()">
+            Guardar Plan
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: EDITAR PLAN -->
+  @if (showEditarPlanModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Editar Plan de Suscripción</h3>
+          <button class="modal-close" (click)="showEditarPlanModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Código del Plan</label>
+            <input type="text" class="form-control font-mono" [(ngModel)]="editarPlanForm.codigo" disabled style="opacity: 0.65;" />
+          </div>
+
+          <div class="form-group">
+            <label>Nombre del Plan *</label>
+            <input type="text" class="form-control" [(ngModel)]="editarPlanForm.nombre" required />
+          </div>
+
+          <div class="form-group">
+            <label>Descripción</label>
+            <textarea class="form-control" rows="2" [(ngModel)]="editarPlanForm.descripcion"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Duración (Días) *</label>
+              <input type="number" class="form-control" min="1" [(ngModel)]="editarPlanForm.duracionDias" required />
+            </div>
+            <div class="form-group col">
+              <label>Tipo de Acceso</label>
+              <select class="form-control" [(ngModel)]="editarPlanForm.tipoAcceso">
+                <option value="ILIMITADO">ILIMITADO</option>
+                <option value="SESIONES">SESIONES CONTADAS</option>
+                <option value="DISCIPLINA_ESPECIFICA">DISCIPLINA ESPECÍFICA</option>
+              </select>
+            </div>
+          </div>
+
+          @if (editarPlanForm.tipoAcceso === 'SESIONES') {
+            <div class="form-group">
+              <label>Límite de Sesiones Totales *</label>
+              <input type="number" class="form-control" min="1" [(ngModel)]="editarPlanForm.sesionesTotales" />
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showEditarPlanModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarEditarPlan()" [disabled]="isLoading()">
+            Guardar Cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: CREAR / EDITAR TARIFA -->
+  @if (showEditarTarifaModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>{{ editarTarifaForm.esNueva ? 'Nueva Tarifa para ' + editarTarifaForm.planNombre : 'Editar Tarifa' }}</h3>
+          <button class="modal-close" (click)="showEditarTarifaModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nombre de la Tarifa *</label>
+            <input type="text" class="form-control" placeholder="Ej: Tarifa Estándar Mensual" [(ngModel)]="editarTarifaForm.nombre" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Monto Tarifa ({{ editarTarifaForm.moneda }}) *</label>
+              <input type="number" step="1" min="0" class="form-control font-semibold" [(ngModel)]="editarTarifaForm.monto" required />
+            </div>
+            <div class="form-group col">
+              <label>Matrícula / Inscripción ({{ editarTarifaForm.moneda }})</label>
+              <input type="number" step="1" min="0" class="form-control font-semibold" [(ngModel)]="editarTarifaForm.matriculaInscripcion" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showEditarTarifaModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarTarifa()" [disabled]="isLoading()">
+            {{ editarTarifaForm.esNueva ? 'Crear Tarifa' : 'Actualizar Tarifa' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: EDITAR DISCIPLINA -->
+  @if (showEditarDisciplinaModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Editar Disciplina Deportiva</h3>
+          <button class="modal-close" (click)="showEditarDisciplinaModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Código de Disciplina</label>
+            <input type="text" class="form-control font-mono" [(ngModel)]="editarDisciplinaForm.codigo" disabled style="opacity: 0.65;" />
+          </div>
+
+          <div class="form-group">
+            <label>Nombre de la Disciplina *</label>
+            <input type="text" class="form-control" [(ngModel)]="editarDisciplinaForm.nombre" required />
+          </div>
+
+          <div class="form-group">
+            <label>Descripción</label>
+            <textarea class="form-control" rows="2" [(ngModel)]="editarDisciplinaForm.descripcion"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group col">
+              <label>Aforo Máximo General (Capacidad de Personas) *</label>
+              <input type="number" min="1" class="form-control font-semibold" [(ngModel)]="editarDisciplinaForm.capacidadMaxima" required />
+            </div>
+            <div class="form-group col" style="max-width: 140px;">
+              <label>Color Identificador</label>
+              <input type="color" class="form-control form-color" [(ngModel)]="editarDisciplinaForm.colorHex" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showEditarDisciplinaModal.set(false)">Cancelar</button>
+          <button class="btn btn-primary" (click)="guardarEditarDisciplina()" [disabled]="isLoading()">
+            Guardar Cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: AJUSTAR AFORO Y CUPOS EN VIVO -->
+  @if (showAjustarAforoModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <h3 style="margin: 0;">Aforo y Cupos: {{ ajustarAforoForm.disciplinaNombre }}</h3>
+            <span class="text-xs text-muted">Ajusta la capacidad general o los cupos de cada turno</span>
+          </div>
+          <button class="modal-close" (click)="showAjustarAforoModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="aforo-general-box">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>Aforo Máximo General de la Sala (Personas)</label>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input
+                  type="number"
+                  min="1"
+                  class="form-control font-semibold"
+                  style="font-size: 1.15rem; color: #6ee7b7; max-width: 160px;"
+                  [(ngModel)]="ajustarAforoForm.capacidadMaxima"
+                />
+                <button type="button" class="btn btn-secondary" (click)="guardarAforoGeneral()">
+                  Guardar Aforo General
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <label class="text-xs font-semibold text-muted uppercase" style="margin: 0;">Cupos Disponibles por Turno / Horario</label>
+              <button type="button" class="btn-link-action" (click)="abrirHorariosDesdeAforo()">
+                Cambiar / Agregar Turnos
+              </button>
+            </div>
+            <div class="horarios-cupos-list">
+              @for (h of ajustarAforoForm.horarios; track h.id) {
+                <div class="horario-cupo-row">
+                  <div class="horario-info">
+                    <span class="font-medium text-light">{{ h.diaSemana }} • {{ h.turno }}</span>
+                    <span class="text-xs text-muted">{{ h.horaInicio }} - {{ h.horaFin }}</span>
+                  </div>
+                  <div class="cupo-stepper">
+                    <button type="button" class="btn-step" (click)="ajustarCupoTurno(h.id, -1)">-</button>
+                    <span class="cupo-display font-mono font-semibold">{{ h.cupoDisponible }}</span>
+                    <button type="button" class="btn-step" (click)="ajustarCupoTurno(h.id, 1)">+</button>
+                  </div>
+                </div>
+              } @empty {
+                <div class="empty-state" style="padding: 1.5rem;">
+                  Esta disciplina no tiene horarios específicos asignados. El acceso se controla con el aforo general.
+                  <div style="margin-top: 0.5rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" (click)="abrirHorariosDesdeAforo()">
+                      + Configurar Horarios y Turnos
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: space-between;">
+          <button type="button" class="btn btn-secondary" (click)="abrirHorariosDesdeAforo()">
+            Administrar Días y Horas
+          </button>
+          <button class="btn btn-primary" (click)="showAjustarAforoModal.set(false)">
+            Listo
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: GESTIÓN COMPLETA DE HORARIOS Y TURNOS -->
+  @if (showGestionHorariosModal()) {
+    @if (disciplinaSeleccionadaHorarios(); as disc) {
+      <div class="modal-backdrop">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="color-pill" [style.background-color]="disc.colorHex || '#3B82F6'"></span>
+              <h3 style="margin: 0;">Horarios y Turnos: {{ disc.nombre }}</h3>
+            </div>
+            <span class="text-xs text-muted">Configura, modifica, agrega o elimina días, franjas horarias y cupos</span>
+          </div>
+          <button class="modal-close" (click)="showGestionHorariosModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+          <!-- 1. TURNOS Y HORARIOS CONFIGURADOS -->
+          <div class="section-block">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="margin: 0; font-size: 0.95rem; color: #ebf4dd;">Turnos Asignados Actualmente</h4>
+              <span class="badge" style="background: rgba(110, 231, 183, 0.15); color: #6ee7b7; border: 1px solid rgba(110, 231, 183, 0.3);">
+                {{ (disc.horarios || []).length }} Turno(s)
+              </span>
+            </div>
+
+            <div class="horarios-gestion-list">
+              @for (h of (disc.horarios || []); track h.id) {
+                <div class="horario-gestion-card" [class.editing]="horarioEnEdicionId() === h.id">
+                  @if (horarioEnEdicionId() === h.id) {
+                    <!-- MODO EDICIÓN INLINE DE ESTE HORARIO -->
+                    <div class="horario-edit-form">
+                      <div class="edit-form-header">
+                        <span class="font-semibold text-accent" style="color: #6ee7b7;">Modificar Horario</span>
+                        <button type="button" class="btn-xs-cancel" (click)="cancelarEdicionHorario()">&times; Cancelar</button>
+                      </div>
+
+                      <div class="form-grid-2">
+                        <div class="form-group">
+                          <label>Días de la Semana</label>
+                          <input
+                            type="text"
+                            class="form-control"
+                            [(ngModel)]="editarHorarioForm.diaSemana"
+                            placeholder="Ej. LUN-MIE-VIE, MAR-JUE, Lunes a Viernes"
+                          />
+                          <div class="quick-presets">
+                            <span (click)="editarHorarioForm.diaSemana = 'LUN-MIE-VIE'">LUN-MIE-VIE</span>
+                            <span (click)="editarHorarioForm.diaSemana = 'MAR-JUE-SAB'">MAR-JUE-SAB</span>
+                            <span (click)="editarHorarioForm.diaSemana = 'LUN A VIE'">LUN A VIE</span>
+                            <span (click)="editarHorarioForm.diaSemana = 'SAB-DOM'">SAB-DOM</span>
+                          </div>
+                        </div>
+
+                        <div class="form-group">
+                          <label>Turno</label>
+                          <select class="form-control" [(ngModel)]="editarHorarioForm.turno">
+                            <option value="MAÑANA">Mañana</option>
+                            <option value="TARDE">Tarde</option>
+                            <option value="NOCHE">Noche</option>
+                            <option value="CONTINUO">Continuo / Todo el día</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="form-grid-3">
+                        <div class="form-group">
+                          <label>Hora Inicio</label>
+                          <input type="time" class="form-control" [(ngModel)]="editarHorarioForm.horaInicio" />
+                        </div>
+                        <div class="form-group">
+                          <label>Hora Fin</label>
+                          <input type="time" class="form-control" [(ngModel)]="editarHorarioForm.horaFin" />
+                        </div>
+                        <div class="form-group">
+                          <label>Cupo Disponible</label>
+                          <input type="number" min="0" class="form-control" [(ngModel)]="editarHorarioForm.cupoDisponible" />
+                        </div>
+                      </div>
+
+                      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+                        <button type="button" class="btn btn-secondary btn-sm" (click)="cancelarEdicionHorario()">
+                          Cancelar
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" (click)="guardarEdicionHorario()" [disabled]="isLoading()">
+                          Guardar Cambios
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <!-- VISTA NORMAL DEL HORARIO -->
+                    <div class="horario-view-row">
+                      <div class="horario-data">
+                        <div class="horario-days-time">
+                          <span class="badge-day">{{ h.horario?.diaSemana }}</span>
+                          <span class="badge-time">{{ h.horario?.horaInicio }} - {{ h.horario?.horaFin }}</span>
+                          <span class="badge-turno" [class]="'turno-' + (h.horario?.turno || 'MAÑANA').toLowerCase()">
+                            {{ h.horario?.turno }}
+                          </span>
+                        </div>
+                        <div class="horario-cupo-text">
+                          <span style="color: #6ee7b7; font-weight: 600;">{{ h.cupoDisponible }} cupos</span> asignados para este turno
+                        </div>
+                      </div>
+
+                      <div class="horario-actions">
+                        <button
+                          type="button"
+                          class="btn-action-sm btn-edit-sm"
+                          (click)="iniciarEdicionHorario(h)"
+                          title="Cambiar horario, días o turno"
+                        >
+                          Modificar Horario
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-action-sm btn-del-sm"
+                          (click)="eliminarTurnoDisciplina(h.id)"
+                          title="Desvincular este horario de la disciplina"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @empty {
+                <div class="empty-state-horarios">
+                  <p style="margin: 0 0 0.5rem 0; font-weight: 500; color: #ebf4dd;">No hay turnos específicos configurados.</p>
+                  <span class="text-xs text-muted">
+                    Los socios pueden ingresar libremente según el aforo general ({{ disc.capacidadMaxima }} personas).
+                    Puedes agregar uno abajo para estructurar turnos y cupos.
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 2. FORMULARIO: AGREGAR NUEVO HORARIO -->
+          <div class="section-block add-horario-box">
+            <h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; color: #6ee7b7; display: flex; align-items: center; gap: 6px;">
+              <span>+</span> Asignar Nuevo Turno / Franja Horaria
+            </h4>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Días de la Semana</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="nuevoHorarioDisciplinaForm.diaSemana"
+                  placeholder="Ej. LUN-MIE-VIE, MAR-JUE-SAB, LUNES A VIERNES"
+                />
+                <div class="quick-presets">
+                  <span (click)="nuevoHorarioDisciplinaForm.diaSemana = 'LUN-MIE-VIE'">LUN-MIE-VIE</span>
+                  <span (click)="nuevoHorarioDisciplinaForm.diaSemana = 'MAR-JUE-SAB'">MAR-JUE-SAB</span>
+                  <span (click)="nuevoHorarioDisciplinaForm.diaSemana = 'LUN A VIE'">LUN A VIE</span>
+                  <span (click)="nuevoHorarioDisciplinaForm.diaSemana = 'SAB-DOM'">SAB-DOM</span>
+                  <span (click)="nuevoHorarioDisciplinaForm.diaSemana = 'TODOS LOS DÍAS'">TODOS LOS DÍAS</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Turno</label>
+                <select class="form-control" [(ngModel)]="nuevoHorarioDisciplinaForm.turno">
+                  <option value="MAÑANA">Mañana</option>
+                  <option value="TARDE">Tarde</option>
+                  <option value="NOCHE">Noche</option>
+                  <option value="CONTINUO">Continuo</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label>Hora Inicio</label>
+                <input type="time" class="form-control" [(ngModel)]="nuevoHorarioDisciplinaForm.horaInicio" />
+              </div>
+              <div class="form-group">
+                <label>Hora Fin</label>
+                <input type="time" class="form-control" [(ngModel)]="nuevoHorarioDisciplinaForm.horaFin" />
+              </div>
+              <div class="form-group">
+                <label>Cupo para este Turno</label>
+                <input
+                  type="number"
+                  min="1"
+                  class="form-control"
+                  [(ngModel)]="nuevoHorarioDisciplinaForm.cupoDisponible"
+                />
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="agregarNuevoHorarioDisciplina()"
+                [disabled]="isLoading()"
+              >
+                + Asignar Horario a {{ disc.nombre }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showGestionHorariosModal.set(false)">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+    }
+  }
+
+  <!-- MODAL: CONFIRMAR ELIMINACIÓN SEGURA (SOFT DELETE) -->
+  @if (showConfirmarEliminarModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card modal-card-danger">
+        <div class="modal-header">
+          <h3 style="color: #fca5a5;">Confirmar Eliminación</h3>
+          <button class="modal-close" (click)="showConfirmarEliminarModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="text-light" style="margin-bottom: 0.75rem; font-size: 1rem;">
+            ¿Estás seguro de que deseas eliminar {{ eliminarTarget.tipo }}:
+          </p>
+          <div class="danger-target-box">
+            <span class="font-bold text-lg" style="color: #ebf4dd;">{{ eliminarTarget.nombre }}</span>
+            <p class="text-xs text-muted" style="margin-top: 0.35rem; margin-bottom: 0;">
+              {{ eliminarTarget.detalle }}
+            </p>
+          </div>
+          <p class="text-xs text-muted" style="margin-top: 0.85rem; font-style: italic;">
+            * Se aplicará desactivación segura (Soft Delete) para no romper el historial de matrículas y boletas de pago previas.
+          </p>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" (click)="showConfirmarEliminarModal.set(false)">Cancelar</button>
+          <button class="btn btn-danger" (click)="ejecutarEliminacionConfirmada()" [disabled]="isLoading()">
+            Sí, Eliminar de Catálogo
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: PASE DIGITAL QR DEL SOCIO -->
+  @if (showPaseQrModal()) {
+    <div class="modal-backdrop">
+      <div class="modal-card pase-digital-modal">
+        <div class="modal-header">
+          <h3>Pase Digital de Acceso (QR Criptográfico)</h3>
+          <button class="modal-close" (click)="showPaseQrModal.set(false)">&times;</button>
+        </div>
+
+        <div class="modal-body pase-digital-body" id="printable-credential">
+          @if (paseQrCargando()) {
+            <div style="text-align: center; padding: 2.5rem 0;">
+              <span class="spinner"></span>
+              <p style="color: #9bb0a5; margin-top: 0.75rem; font-size: 0.85rem;">
+                Firmando credencial HMAC-SHA256 y renderizando SVG vectorial...
+              </p>
+            </div>
+          } @else if (paseQrInscripcion(); as ins) {
+            <div class="credential-card">
+              <div class="credential-top">
+                <div>
+                  <span class="credential-brand">APEX FITNESS</span>
+                  <div class="credential-tag">PASE DIGITAL DE ACCESO</div>
+                </div>
+                <span class="credential-badge">VÁLIDO</span>
+              </div>
+
+              @if (paseQrError(); as err) {
+                <div class="credential-qr-box" style="flex-direction: column; justify-content: center; text-align: center; border-color: rgba(239, 68, 68, 0.4); padding: 0.75rem;">
+                  <div style="font-size: 0.72rem; color: #fca5a5; line-height: 1.3; word-break: break-word;">
+                    {{ err }}
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" style="margin-top: 0.6rem; padding: 0.25rem 0.6rem; font-size: 0.72rem;" (click)="abrirPaseDigital(ins)">
+                    Reintentar
+                  </button>
+                </div>
+              } @else {
+                <div class="credential-qr-box" [innerHTML]="paseQrSvg()"></div>
+              }
+
+              <div class="credential-info">
+                <div class="socio-name">{{ obtenerNombreCliente(ins.clienteId) }}</div>
+                <div class="socio-matricula">{{ ins.codigoMatricula }}</div>
+                <div class="plan-detail">{{ obtenerNombrePlan(ins.planId) }}</div>
+                <div class="validity-dates">
+                  Vigencia: {{ ins.fechaInicio }} al <strong>{{ ins.fechaFin }}</strong>
+                </div>
+                <div class="security-seal">
+                  Criptografía HMAC-SHA256 • Anti-Clonación Activa
+                </div>
+              </div>
+            </div>
+
+            <div class="credential-actions no-print">
+              <button type="button" class="btn btn-secondary" (click)="imprimirPaseDigital()">
+                Imprimir Credencial
+              </button>
+              <button type="button" class="btn btn-primary" (click)="showPaseQrModal.set(false)">
+                Listo
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MODAL: INFORMACIÓN DE LA BOLETA DE INSCRIPCIÓN Y ESTADO DE HABILITACIÓN DEL QR -->
+  @if (showModalVerificacionQr() && verificacionQrData(); as vData) {
+    <div class="modal-backdrop" (click)="cerrarModalVerificacionQr()">
+      <div class="modal-card verificacion-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span class="status-indicator-dot" [class.dot-green]="vData.resultado.permitido" [class.dot-red]="!vData.resultado.permitido"></span>
+            <h3>Verificación de Pase QR • Boleta de Inscripción</h3>
+          </div>
+          <button class="modal-close" (click)="cerrarModalVerificacionQr()">&times;</button>
+        </div>
+
+        <div class="modal-body verificacion-modal-body">
+          <!-- 1. HERO BANNER DE HABILITACIÓN -->
+          <div
+            class="verificacion-status-hero"
+            [class.status-habilitado]="vData.resultado.permitido"
+            [class.status-denegado]="!vData.resultado.permitido"
+          >
+            <div class="status-hero-icon">
+              @if (vData.resultado.permitido) {
+                <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="#f87171" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="15" y1="9" x2="9" y2="15"></line>
+                  <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+              }
+            </div>
+
+            <div class="status-hero-content">
+              <div class="status-hero-badges">
+                <span class="status-hero-tag" [class.tag-permitido]="vData.resultado.permitido" [class.tag-denegado]="!vData.resultado.permitido">
+                  {{ vData.resultado.permitido ? 'SOCIO HABILITADO' : 'NO HABILITADO' }}
+                </span>
+                <span class="movement-tag">
+                  {{ vData.tipoMovimiento === 'ENTRADA' ? 'MOVIMIENTO: ENTRADA' : 'MOVIMIENTO: SALIDA' }}
+                </span>
+              </div>
+
+              <h2 class="status-hero-title">
+                {{ vData.resultado.permitido ? 'ACCESO AUTORIZADO' : 'ACCESO DENEGADO' }}
+              </h2>
+
+              <p class="status-hero-message">
+                {{ vData.resultado.registroAcceso.motivoDenegacion || vData.resultado.mensaje }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Sugerencia Anti-Passback para conveniencia del operador -->
+          @if (!vData.resultado.permitido && vData.resultado.registroAcceso.motivoDenegacion?.includes('Anti-Passback') && vData.tipoMovimiento === 'ENTRADA') {
+            <div class="anti-passback-quick-action">
+              <div class="anti-passback-text">
+                <strong>¿El socio está registrando su salida?</strong> El sistema detectó que ya ingresó recientemente. Puedes registrar su egreso directamente:
+              </div>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                (click)="cambiarMovimientoYReintentar('SALIDA')"
+              >
+                Cambiar a SALIDA y Validar
+              </button>
+            </div>
+          }
+
+          <!-- 2. CARD DE INFORMACIÓN DE LA BOLETA DE INSCRIPCIÓN -->
+          <div class="verificacion-boleta-card">
+            <div class="boleta-card-header">
+              <div class="boleta-card-title">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6ee7b7" stroke-width="2" style="vertical-align: -3px; margin-right: 6px;">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Detalle de la Boleta de Inscripción
+              </div>
+              @if (vData.inscripcion?.estado; as est) {
+                <span class="badge" [class.badge-activa]="est === 'ACTIVA'" [class.badge-congelada]="est === 'CONGELADA'" [class.badge-vencida]="est === 'VENCIDA'">
+                  {{ est }}
+                </span>
+              } @else {
+                <span class="badge badge-activa">VIGENTE</span>
+              }
+            </div>
+
+            <div class="boleta-grid">
+              <!-- Matrícula -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Código de Matrícula:</span>
+                <span class="boleta-val matricula-val">
+                  {{ (vData.inscripcion ? vData.inscripcion.codigoMatricula : null) || vData.resultado.codigoMatricula || vData.qrPayloadDecoded?.mat || 'N/A' }}
+                </span>
+              </div>
+
+              <!-- Socio -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Socio / Titular:</span>
+                <span class="boleta-val">
+                  @if (vData.cliente; as cli) {
+                    <strong>{{ cli.nombre }} {{ cli.apellido }}</strong>
+                    <span class="sub-val">CI: {{ cli.ci }} • Cod: {{ cli.codigo }}</span>
+                  } @else {
+                    <strong>{{ obtenerNombreCliente(vData.resultado.clienteId) }}</strong>
+                  }
+                </span>
+              </div>
+
+              <!-- Plan -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Plan Contratado:</span>
+                <span class="boleta-val">
+                  @if (vData.inscripcion; as ins) {
+                    {{ ins.plan ? ins.plan.nombre : obtenerNombrePlan(ins.planId) }}
+                    @if (ins.plan && ins.plan.tipoAcceso) {
+                      <span class="sub-val">{{ ins.plan.tipoAcceso }}</span>
+                    }
+                  } @else {
+                    {{ vData.resultado.planNombre || 'Plan de Membresía' }}
+                  }
+                </span>
+              </div>
+
+              <!-- Disciplina Vinculada -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Disciplina Vinculada:</span>
+                <span class="boleta-val">
+                  @if (vData.inscripcion?.disciplina; as d) {
+                    <strong [style.color]="d.colorHex || '#6ee7b7'">{{ d.nombre }}</strong>
+                  } @else if (vData.inscripcion?.disciplinaHorario?.disciplina; as dh) {
+                    <strong [style.color]="dh.colorHex || '#6ee7b7'">{{ dh.nombre }}</strong>
+                  } @else if (vData.inscripcion?.disciplinaId; as did) {
+                    <strong style="color: #6ee7b7;">{{ obtenerNombreDisciplina(did) }}</strong>
+                  } @else {
+                    <span style="color: #6ee7b7;">Musculación y Fuerza</span>
+                  }
+                  @if (vData.inscripcion?.disciplinaHorario?.horario; as h) {
+                    <span class="sub-val">{{ h.diaSemana }} • {{ h.horaInicio | slice:0:5 }} - {{ h.horaFin | slice:0:5 }} (Turno {{ h.turno }})</span>
+                  }
+                </span>
+              </div>
+
+              <!-- Período de Vigencia -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Vigencia Membresía:</span>
+                <span class="boleta-val">
+                  @if (vData.inscripcion; as ins) {
+                    {{ ins.fechaInicio }} al <strong>{{ ins.fechaFin }}</strong>
+                  } @else if (vData.qrPayloadDecoded?.exp) {
+                    Vence: <strong>{{ formatearFechaQr(vData.qrPayloadDecoded.exp) }}</strong>
+                  } @else {
+                    Consultar vigencia en administración
+                  }
+                </span>
+              </div>
+
+              <!-- Días Restantes -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Días de Cobertura:</span>
+                <span class="boleta-val" [class.text-warning]="(vData.resultado.diasRestantes ?? 99) <= 3">
+                  @if (vData.resultado.diasRestantes !== undefined && vData.resultado.diasRestantes !== null) {
+                    <strong>{{ vData.resultado.diasRestantes }} días restantes</strong>
+                  } @else {
+                    Activo
+                  }
+                </span>
+              </div>
+
+              <!-- Sesiones -->
+              <div class="boleta-grid-item">
+                <span class="boleta-label">Sesiones Disponibles:</span>
+                <span class="boleta-val">
+                  @if (vData.resultado.sesionesRestantes !== undefined && vData.resultado.sesionesRestantes !== null) {
+                    <strong>{{ vData.resultado.sesionesRestantes }} sesiones restantes</strong>
+                  } @else if (vData.inscripcion; as ins) {
+                    @if (ins.totalSesiones) {
+                      {{ (ins.totalSesiones - ins.sesionesConsumidas) }} de {{ ins.totalSesiones }} restantes
+                    } @else {
+                      Acceso Ilimitado / Libre
+                    }
+                  } @else {
+                    Acceso Ilimitado / Libre
+                  }
+                </span>
+              </div>
+            </div>
+
+            <!-- Boleta de Pago si existe -->
+            @if (vData.inscripcion?.boletaPago; as pago) {
+              <div class="boleta-pago-strip">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <span class="pago-tag">PAGO REGISTRADO</span>
+                  <span>Recibo: <strong>{{ pago.numeroComprobante }}</strong></span>
+                  <span>•</span>
+                  <span>Total: <strong>{{ pago.montoTotal | number:'1.2-2' }} BOB</strong></span>
+                  <span>•</span>
+                  <span>Método: <strong>{{ pago.metodoPago }}</strong></span>
+                </div>
+                <span class="badge badge-activa" style="font-size: 0.7rem;">{{ pago.estado }}</span>
+              </div>
+            }
+          </div>
+
+          <!-- 3. DETALLE DEL REGISTRO DE ACCESO / TORNIQUETE -->
+          <div class="verificacion-audit-card">
+            <div class="audit-item">
+              <span class="audit-label">Dispositivo:</span>
+              <span class="audit-val">{{ vData.resultado.registroAcceso.dispositivoTorniquete || torniqueteForm.dispositivoTorniquete }}</span>
+            </div>
+            <div class="audit-item">
+              <span class="audit-label">Hora:</span>
+              <span class="audit-val">{{ vData.resultado.registroAcceso.fechaHora | date:'medium' }}</span>
+            </div>
+            <div class="audit-item">
+              <span class="audit-label">Criptografía:</span>
+              <span class="audit-val text-success">HMAC-SHA256 Verificada</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem; border-top: 1px solid rgba(144, 171, 139, 0.2);">
+          <button type="button" class="btn btn-primary" (click)="cerrarModalVerificacionQr()">
+            Entendido / Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
