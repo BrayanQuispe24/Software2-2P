@@ -9,7 +9,7 @@ export interface GraphQLResponse<T> {
   providedIn: 'root',
 })
 export class GraphQLClientService {
-  private readonly endpoint = 'http://localhost:4002/graphql';
+  private readonly endpoint = 'http://localhost:8084/graphql';
 
   async query<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
     const response = await fetch(this.endpoint, {

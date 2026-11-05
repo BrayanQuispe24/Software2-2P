@@ -25,7 +25,13 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL', 'http://localhost:5173'),
+    origin: (origin: any, callback: any) => {
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   });
 

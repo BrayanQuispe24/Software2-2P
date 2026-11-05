@@ -132,7 +132,7 @@ export class OidcInteractionController {
             <div class="card">
               <h1>Iniciar Sesión</h1>
               <p class="subtitle">Accede a <strong>${clientName}</strong> con tu cuenta</p>
-              <form method="POST" action="/interaction/${uid}/login">
+              <form method="POST" action="/interaction/${uid}/login" onsubmit="const b = document.getElementById('submitBtn'); if (b) { b.disabled = true; b.innerText = 'Iniciando sesión...'; }">
                 <div class="form-group">
                   <label for="identifier">Correo electrónico, Código o CI</label>
                   <input type="text" id="identifier" name="identifier" required placeholder="usuario@ejemplo.com" autofocus autocomplete="username" />
@@ -141,7 +141,7 @@ export class OidcInteractionController {
                   <label for="password">Contraseña</label>
                   <input type="password" id="password" name="password" required placeholder="••••••••" autocomplete="current-password" />
                 </div>
-                <button type="submit">Continuar</button>
+                <button type="submit" id="submitBtn">Continuar</button>
               </form>
               <div style="margin-top: 1.5rem; text-align: center; border-top: 1px solid rgba(144, 171, 139, 0.25); padding-top: 1rem;">
                 <p style="color: #90AB8B; font-size: 0.85rem; margin-bottom: 0.5rem;">¿Eres cliente nuevo?</p>
@@ -196,6 +196,10 @@ export class OidcInteractionController {
         prompt: prompt.name,
       });
     } catch (error) {
+      console.error('[getInteraction ERROR]', error);
+      if (req.accepts('html')) {
+        return res.status(HttpStatus.BAD_REQUEST).send(this.renderExpiredHtml());
+      }
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'interaction_error',
         message: error instanceof Error ? error.message : 'Error al procesar interacción',
@@ -278,11 +282,43 @@ export class OidcInteractionController {
         },
       );
     } catch (error) {
+      console.error('[postLogin ERROR]', error);
+      if (req.accepts('html')) {
+        return res.status(HttpStatus.BAD_REQUEST).send(this.renderExpiredHtml());
+      }
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: 'login_error',
         message: error instanceof Error ? error.message : 'Error durante el login',
       });
     }
+  }
+
+  private renderExpiredHtml(): string {
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sesión Expirada - SSO</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #242E35; color: #EBF4DD; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 1rem; }
+          .card { background: #3B4953; padding: 2.2rem; border-radius: 14px; text-align: center; max-width: 420px; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: 0 15px 35px rgba(0,0,0,0.5); }
+          h2 { color: #fca5a5; margin-top: 0; font-size: 1.4rem; }
+          p { color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.5rem; }
+          a.btn { background: #5A7863; color: #EBF4DD; text-decoration: none; display: inline-block; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem; transition: background 0.2s; box-shadow: 0 4px 12px rgba(90, 120, 99, 0.3); }
+          a.btn:hover { background: #4a6652; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>Sesión Expirada o Inválida</h2>
+          <p>La sesión de autenticación ha expirado, ya fue utilizada o la ventana estuvo abierta por mucho tiempo.</p>
+          <a href="http://localhost:5173/login" class="btn">Iniciar Sesión Nuevamente</a>
+        </div>
+      </body>
+      </html>
+    `;
   }
 
   @Get(':uid/register')

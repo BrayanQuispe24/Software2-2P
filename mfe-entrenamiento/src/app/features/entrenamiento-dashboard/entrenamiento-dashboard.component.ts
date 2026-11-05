@@ -13,8 +13,16 @@ import { Rutina } from '../rutinas/domain/models/rutina.model';
 import { PlanEntrenamiento } from '../planes/domain/models/plan.model';
 import { PlanAlimentacion } from '../nutricion/domain/models/nutricion.model';
 import { Historial, DetalleHistorial } from '../antropometria/domain/models/antropometria.model';
+import { IaClientService, StatelessAnalysisResponse } from '../../core/ia/ia.client';
 
-export type TabType = 'ejercicios' | 'rutinas' | 'planes' | 'nutricion' | 'antropometria';
+export type TabType = 'ejercicios' | 'rutinas' | 'planes' | 'nutricion' | 'antropometria' | 'ia-evaluation';
+export type IaSubTabType = 'parametros' | 'diagnostico' | 'plan';
+
+const CLIENTES_BASE_DEMO: Array<{ id: string; nombre: string }> = [
+  { id: 'c2000000-0000-0000-0000-000000000001', nombre: 'Carlos Mendoza Rivera (CI: 4892019)' },
+  { id: 'd9d0b968-b7d4-4b15-9ab6-7ae3637fcb5f', nombre: 'Brayan Quispe (CI: 6305913)' },
+  { id: '7a8a53be-ad36-4fad-9491-3233a3dbf341', nombre: 'Juan PPerez (CI: 87654321)' },
+];
 
 @Component({
   selector: 'app-entrenamiento-dashboard',
@@ -29,10 +37,83 @@ export class EntrenamientoDashboardComponent implements OnInit {
   private readonly planRepo = inject(PLAN_REPOSITORY);
   private readonly nutricionRepo = inject(NUTRICION_REPOSITORY);
   private readonly antropometriaRepo = inject(ANTROPOMETRIA_REPOSITORY);
+  private readonly iaClient = inject(IaClientService);
 
-  // Socio Activo y catálogo de clientes (cargados dinámicamente desde la API)
-  readonly socioId = signal<string>('');
-  readonly sociosDisponibles = signal<Array<{ id: string; nombre: string }>>([]);
+  // Estados de IA
+  readonly iaLoading = signal<boolean>(false);
+  readonly resultadoIa = signal<StatelessAnalysisResponse | null>(null);
+  readonly iaActiveSubTab = signal<IaSubTabType>('parametros');
+
+  setIaSubTab(tab: IaSubTabType): void {
+    this.iaActiveSubTab.set(tab);
+  }
+
+  // Formulario IA
+  iaForm = {
+    edad: 28,
+    peso: 75.5,
+    alturaCm: 178,
+    nivel: 'INTERMEDIO',
+    objetivo: 'HIPERTROFIA',
+    diasDisponibles: 4,
+    duracionMinutos: 60,
+    tipoVideo: 'SQUAT' as 'SQUAT' | 'PUSHUP',
+  };
+
+  readonly equipamientoOpciones = [
+    { id: 'dumbbells', label: 'Mancuernas' },
+    { id: 'barbell', label: 'Barra Olímpica' },
+    { id: 'machine', label: 'Máquinas / Poleas' },
+    { id: 'bench', label: 'Banco Plano / Inclinado' },
+    { id: 'kettlebell', label: 'Kettlebells' },
+    { id: 'bodyweight', label: 'Peso Corporal' },
+    { id: 'bands', label: 'Bandas Elásticas' },
+    { id: 'cables', label: 'Cruce de Poleas' },
+  ];
+
+  readonly equipamientoSeleccionado = signal<string[]>(['dumbbells', 'barbell', 'machine', 'bench']);
+
+  toggleEquipamiento(id: string): void {
+    const actuales = this.equipamientoSeleccionado();
+    if (actuales.includes(id)) {
+      this.equipamientoSeleccionado.set(actuales.filter((x) => x !== id));
+    } else {
+      this.equipamientoSeleccionado.set([...actuales, id]);
+    }
+  }
+
+  readonly restriccionesOpciones = [
+    { id: 'lumbar', label: 'Zona Lumbar' },
+    { id: 'rodilla', label: 'Rodillas' },
+    { id: 'hombro', label: 'Hombros' },
+    { id: 'cervical', label: 'Columna Cervical' },
+    { id: 'muneca', label: 'Muñecas' },
+  ];
+
+  readonly restriccionesSeleccionadas = signal<string[]>([]);
+
+  toggleRestriccion(id: string): void {
+    const actuales = this.restriccionesSeleccionadas();
+    if (actuales.includes(id)) {
+      this.restriccionesSeleccionadas.set(actuales.filter((x) => x !== id));
+    } else {
+      this.restriccionesSeleccionadas.set([...actuales, id]);
+    }
+  }
+
+  fotoFrontalArchivo: File | null = null;
+  fotoLateralArchivo: File | null = null;
+  fotoPosteriorArchivo: File | null = null;
+  videoArchivo: File | null = null;
+
+  readonly fotoFrontalNombre = signal<string>('');
+  readonly fotoLateralNombre = signal<string>('');
+  readonly fotoPosteriorNombre = signal<string>('');
+  readonly videoNombre = signal<string>('');
+
+  // Socio Activo y catálogo de clientes (inicializado con socios activos y enriquecido vía API)
+  readonly socioId = signal<string>('c2000000-0000-0000-0000-000000000001');
+  readonly sociosDisponibles = signal<Array<{ id: string; nombre: string }>>(CLIENTES_BASE_DEMO);
 
   // Pestaña Activa
   readonly activeTab = signal<TabType>('ejercicios');
@@ -260,16 +341,24 @@ export class EntrenamientoDashboardComponent implements OnInit {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       let users: any[] | null = null;
+      // 1. Intento por API Gateway (incluyendo cookies de sesión http-only)
       try {
-        const res = await fetch('http://localhost:3000/api/users', { headers });
+        const res = await fetch('http://localhost:3000/api/users', {
+          headers,
+          credentials: 'include',
+        });
         if (res.ok) users = await res.json();
       } catch {
         users = null;
       }
 
+      // 2. Intento directo por MS Auth (puerto 4000)
       if (!users || !Array.isArray(users)) {
         try {
-          const res = await fetch('http://localhost:4000/users', { headers });
+          const res = await fetch('http://localhost:4000/users', {
+            headers,
+            credentials: 'include',
+          });
           if (res.ok) users = await res.json();
         } catch {
           users = null;
@@ -277,17 +366,35 @@ export class EntrenamientoDashboardComponent implements OnInit {
       }
 
       if (users && Array.isArray(users)) {
-        const clientesRemotos = users
-          .filter((u: any) => u.tipoUsuario === 'CLIENTE' || (!u.tipoUsuario && !u.rol))
+        const clientesApi = users
+          .filter((u: any) => {
+            const tipo = String(u.tipoUsuario || '').trim().toUpperCase();
+            const rol = String(u.rol || u.role || '').trim().toUpperCase();
+            const roles: string[] = Array.isArray(u.roles)
+              ? u.roles.map((r: any) => String(r?.name || r || '').trim().toUpperCase())
+              : [];
+
+            // Debe ser estrictamente rol o tipoUsuario CLIENTE
+            const esCliente = tipo === 'CLIENTE' || rol === 'CLIENTE' || roles.includes('CLIENTE');
+            const esPersonal =
+              ['ADMIN', 'ADMINISTRADOR', 'INSTRUCTOR', 'RECEPCIONISTA'].includes(tipo) ||
+              ['ADMIN', 'ADMINISTRADOR', 'INSTRUCTOR', 'RECEPCIONISTA'].includes(rol) ||
+              roles.some((r) => ['ADMIN', 'ADMINISTRADOR', 'INSTRUCTOR', 'RECEPCIONISTA'].includes(r));
+
+            return esCliente && !esPersonal;
+          })
           .map((u: any) => ({
             id: u.id,
             nombre: `${u.nombre || ''} ${u.apellido || ''}${u.ci ? ` (CI: ${u.ci})` : ''}`.trim(),
           }));
 
-        if (clientesRemotos.length > 0) {
-          this.sociosDisponibles.set(clientesRemotos);
-          if (!this.socioId() || !clientesRemotos.some((c) => c.id === this.socioId())) {
-            this.socioId.set(clientesRemotos[0].id);
+        if (clientesApi.length > 0) {
+          // Mostrar única y exclusivamente usuarios con rol CLIENTE
+          this.sociosDisponibles.set(clientesApi);
+
+          if (!this.socioId() || !clientesApi.some((c) => c.id === this.socioId())) {
+            this.socioId.set(clientesApi[0].id);
+            this.cargarDatosSocio();
           }
         }
       }
@@ -641,4 +748,161 @@ export class EntrenamientoDashboardComponent implements OnInit {
     if (imc <= 29.9) return 'Sobrepeso Grado I';
     return 'Obesidad';
   }
+
+  // --- Métodos de Evaluación y Aprobación con IA ---
+  onFotoSelected(event: Event, vista: 'frontal' | 'lateral' | 'posterior'): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      if (vista === 'frontal') {
+        this.fotoFrontalArchivo = file;
+        this.fotoFrontalNombre.set(file.name);
+      }
+      if (vista === 'lateral') {
+        this.fotoLateralArchivo = file;
+        this.fotoLateralNombre.set(file.name);
+      }
+      if (vista === 'posterior') {
+        this.fotoPosteriorArchivo = file;
+        this.fotoPosteriorNombre.set(file.name);
+      }
+    }
+  }
+
+  quitarFoto(vista: 'frontal' | 'lateral' | 'posterior'): void {
+    if (vista === 'frontal') {
+      this.fotoFrontalArchivo = null;
+      this.fotoFrontalNombre.set('');
+    }
+    if (vista === 'lateral') {
+      this.fotoLateralArchivo = null;
+      this.fotoLateralNombre.set('');
+    }
+    if (vista === 'posterior') {
+      this.fotoPosteriorArchivo = null;
+      this.fotoPosteriorNombre.set('');
+    }
+  }
+
+  onVideoSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      this.videoArchivo = file;
+      this.videoNombre.set(file.name);
+    }
+  }
+
+  quitarVideo(): void {
+    this.videoArchivo = null;
+    this.videoNombre.set('');
+  }
+
+  async ejecutarEvaluacionIa(): Promise<void> {
+    try {
+      this.iaLoading.set(true);
+      this.errorMessage.set(null);
+
+      const formData = new FormData();
+      formData.append('client_id', this.socioId() || '3fa85f64-5717-4562-b3fc-2c963f66afa6');
+      formData.append('age', String(this.iaForm.edad));
+      formData.append('weight_kg', String(this.iaForm.peso));
+      formData.append('height_cm', String(this.iaForm.alturaCm));
+      formData.append('fitness_level', this.iaForm.nivel);
+      formData.append('fitness_goal', this.iaForm.objetivo);
+      formData.append('available_days_per_week', String(this.iaForm.diasDisponibles));
+      formData.append('session_duration_minutes', String(this.iaForm.duracionMinutos));
+      formData.append('available_equipment', JSON.stringify(this.equipamientoSeleccionado()));
+      formData.append('physical_restrictions', JSON.stringify(this.restriccionesSeleccionadas()));
+
+      if (this.fotoFrontalArchivo) {
+        formData.append('photo_frontal', this.fotoFrontalArchivo);
+      }
+      if (this.fotoLateralArchivo) {
+        formData.append('photo_lateral', this.fotoLateralArchivo);
+      }
+      if (this.fotoPosteriorArchivo) {
+        formData.append('photo_posterior', this.fotoPosteriorArchivo);
+      }
+      if (this.videoArchivo) {
+        formData.append('video_exercise', this.videoArchivo);
+        formData.append('video_exercise_type', this.iaForm.tipoVideo);
+      }
+
+      const res = await this.iaClient.analyzeAndRecommend(formData);
+      this.resultadoIa.set(res);
+      this.iaActiveSubTab.set('diagnostico');
+      this.successMessage.set('Análisis postural, biomecánico y propuesta de rutina generados por IA.');
+    } catch (err: any) {
+      this.errorMessage.set(err.message || 'Error al ejecutar evaluación con IA.');
+    } finally {
+      this.iaLoading.set(false);
+    }
+  }
+
+  async aprobarPlanIa(): Promise<void> {
+    const res = this.resultadoIa();
+    if (!res || !res.workout_plan) return;
+
+    try {
+      this.iaLoading.set(true);
+      const plan = res.workout_plan;
+      const rutinasProgramadas: Array<{ diaSemana: string; idRutina: string }> = [];
+      const diasSemanaMap = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
+      const ejerciciosDisponibles = this.ejercicios();
+
+      for (let i = 0; i < plan.days.length; i++) {
+        const dia = plan.days[i];
+        const diaSemana = diasSemanaMap[i % diasSemanaMap.length];
+
+        const ejerciciosPayload = dia.exercises.map((ex, idx) => {
+          const match = ejerciciosDisponibles.find((e) =>
+            e.nombre.toLowerCase().includes(ex.exercise_name.toLowerCase()) ||
+            ex.exercise_name.toLowerCase().includes(e.nombre.toLowerCase())
+          );
+          const finalId = match?.id || (ejerciciosDisponibles[idx % ejerciciosDisponibles.length]?.id ?? '00000000-0000-0000-0000-000000000000');
+          return {
+            idEjercicio: finalId,
+            series: ex.target_sets,
+            repeticiones: ex.target_reps,
+            descansoSegundos: ex.rest_seconds,
+            orden: idx + 1,
+            peso: 0,
+            observacion: ex.notes || 'Asignado automáticamente por recomendador IA',
+          };
+        });
+
+        const nuevaRutina = await this.rutinaRepo.crearRutina({
+          nombre: `Rutina IA: ${dia.day_label}`,
+          descripcion: `Generada por IA para ${res.fitness_goal} (${dia.exercises.length} ejercicios).`,
+          nivel: res.fitness_level,
+          ejercicios: ejerciciosPayload,
+        });
+
+        rutinasProgramadas.push({
+          diaSemana,
+          idRutina: nuevaRutina.id,
+        });
+      }
+
+      await this.planRepo.asignarPlan({
+        idUsuario: this.socioId(),
+        nombre: plan.program_name,
+        objetivo: `${res.fitness_goal} - Aprobado por Entrenador`,
+        fechaInicio: new Date().toISOString().substring(0, 10),
+        fechaFin: new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().substring(0, 10),
+        observacion: `${plan.justification} | Aprobado formalmente por el entrenador (Human-in-the-Loop).`,
+        rutinas: rutinasProgramadas,
+      });
+
+      this.successMessage.set('¡Plan generado por IA revisado, aprobado y asignado formalmente al socio!');
+      await this.cargarDatosSocio();
+      this.activeTab.set('planes');
+    } catch (err: any) {
+      this.errorMessage.set(err.message || 'Error al aprobar plan de IA.');
+    } finally {
+      this.iaLoading.set(false);
+    }
+  }
 }
+

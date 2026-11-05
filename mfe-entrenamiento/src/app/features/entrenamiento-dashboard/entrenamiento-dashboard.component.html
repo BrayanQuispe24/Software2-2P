@@ -117,6 +117,14 @@
       <span>Historial & Antropometría</span>
       <span class="tab-counter">{{ historialClinico()?.detalles?.length ?? 0 }}</span>
     </button>
+    <button
+      class="tab-btn tab-btn-ia"
+      [class.active]="activeTab() === 'ia-evaluation'"
+      (click)="setTab('ia-evaluation')"
+    >
+      <span>Evaluación IA (MediaPipe)</span>
+      <span class="status-indicator-badge ia-badge">Deep Learning</span>
+    </button>
   </nav>
 
   <!-- CONTENT TABS -->
@@ -660,6 +668,511 @@
             <button class="btn-action primary" (click)="abrirModalMedicion()">Registrar Primera Medición</button>
           </div>
         }
+      </section>
+    }
+
+    <!-- ==================== TAB 6: EVALUACIÓN IA (MEDIAPIPE & NEURAL CF) ==================== -->
+    @if (activeTab() === 'ia-evaluation') {
+      <section class="section-pane ia-pane">
+        <div class="pane-header ia-header">
+          <div>
+            <div class="brand-row">
+              <span class="brand-badge ia-badge">FASTAPI + PYTORCH</span>
+              <h2 class="pane-title">Evaluación Biomecánica por Visión Artificial & Recomendador Neural CF</h2>
+            </div>
+            <p class="pane-subtitle">
+              Analiza fotografías con 33 landmarks de MediaPipe, mide cadencia y profundidad en video, y genera un plan semanal adaptativo con aprobación humana obligatoria.
+            </p>
+          </div>
+        </div>
+
+        <!-- NAVEGACIÓN DE SUB-PESTAÑAS DE EVALUACIÓN IA -->
+        <div class="ia-subtabs-nav">
+          <button
+            type="button"
+            class="ia-subtab-btn"
+            [class.active]="iaActiveSubTab() === 'parametros'"
+            (click)="setIaSubTab('parametros')"
+          >
+            <span class="subtab-step">1</span>
+            <span class="subtab-title">Configuración & Captura</span>
+          </button>
+
+          <button
+            type="button"
+            class="ia-subtab-btn"
+            [class.active]="iaActiveSubTab() === 'diagnostico'"
+            [disabled]="!resultadoIa()"
+            (click)="setIaSubTab('diagnostico')"
+          >
+            <span class="subtab-step">2</span>
+            <span class="subtab-title">Diagnóstico Biomecánico</span>
+            @if (resultadoIa()) {
+              <span class="subtab-status-chip ready">Listo</span>
+            } @else {
+              <span class="subtab-status-chip disabled">Pendiente</span>
+            }
+          </button>
+
+          <button
+            type="button"
+            class="ia-subtab-btn"
+            [class.active]="iaActiveSubTab() === 'plan'"
+            [disabled]="!resultadoIa()"
+            (click)="setIaSubTab('plan')"
+          >
+            <span class="subtab-step">3</span>
+            <span class="subtab-title">Plan Adaptativo & Aprobación</span>
+            @if (resultadoIa()) {
+              <span class="subtab-status-chip pending">Revisión Obligatoria</span>
+            } @else {
+              <span class="subtab-status-chip disabled">Pendiente</span>
+            }
+          </button>
+        </div>
+
+        <!-- CONTENIDO DE SUB-PESTAÑAS -->
+        <div class="ia-layout-wrapper">
+          @if (iaActiveSubTab() === 'parametros') {
+            <div class="ia-card form-card-modern">
+            <div class="card-hero-banner">
+              <div class="hero-icon-wrap">
+                <span class="hero-chip-icon">AI</span>
+              </div>
+              <div class="hero-text-group">
+                <h3 class="hero-card-title">Configuración de Parámetros & Visión por Computadora</h3>
+                <p class="hero-card-desc">Personaliza el contexto fisiológico y sube imágenes o video para el análisis cinemático.</p>
+              </div>
+            </div>
+
+            <form (ngSubmit)="ejecutarEvaluacionIa()" class="ia-form-modern">
+              <div class="ia-form-columns">
+                <!-- COLUMNA IZQUIERDA: BIOMETRÍA Y METAS -->
+                <div class="ia-col-section">
+                  <div class="section-badge-header">
+                    <span class="step-badge">Paso 1</span>
+                    <h4 class="section-title-text">Biometría & Disponibilidad</h4>
+                  </div>
+
+                  <div class="form-row three-col">
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Edad</label>
+                      <div class="input-with-unit">
+                        <input type="number" class="form-input-modern" [(ngModel)]="iaForm.edad" name="edad" min="14" max="90" required />
+                        <span class="unit-tag">años</span>
+                      </div>
+                    </div>
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Peso</label>
+                      <div class="input-with-unit">
+                        <input type="number" step="0.1" class="form-input-modern" [(ngModel)]="iaForm.peso" name="peso" min="30" max="300" required />
+                        <span class="unit-tag">kg</span>
+                      </div>
+                    </div>
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Estatura</label>
+                      <div class="input-with-unit">
+                        <input type="number" class="form-input-modern" [(ngModel)]="iaForm.alturaCm" name="alturaCm" min="100" max="250" required />
+                        <span class="unit-tag">cm</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-row two-col">
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Nivel de Condición</label>
+                      <select class="form-select-modern" [(ngModel)]="iaForm.nivel" name="nivel" required>
+                        <option value="PRINCIPIANTE">Principiante (Iniciación)</option>
+                        <option value="INTERMEDIO">Intermedio (Regular)</option>
+                        <option value="AVANZADO">Avanzado (Atleta)</option>
+                      </select>
+                    </div>
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Objetivo Principal</label>
+                      <select class="form-select-modern" [(ngModel)]="iaForm.objetivo" name="objetivo" required>
+                        <option value="HIPERTROFIA">Hipertrofia Muscular</option>
+                        <option value="FUERZA">Fuerza Máxima</option>
+                        <option value="PERDIDA_GRASA">Pérdida de Grasa</option>
+                        <option value="RESISTENCIA">Resistencia Muscular</option>
+                        <option value="SALUD_GENERAL">Salud & Movilidad</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="form-row two-col">
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Frecuencia Semanal</label>
+                      <div class="input-with-unit">
+                        <input type="number" class="form-input-modern" [(ngModel)]="iaForm.diasDisponibles" name="diasDisponibles" min="1" max="7" required />
+                        <span class="unit-tag">días/sem</span>
+                      </div>
+                    </div>
+                    <div class="form-group-modern">
+                      <label class="field-label-modern">Tiempo por Sesión</label>
+                      <div class="input-with-unit">
+                        <input type="number" class="form-input-modern" [(ngModel)]="iaForm.duracionMinutos" name="duracionMinutos" min="15" max="180" required />
+                        <span class="unit-tag">minutos</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- RESTRICCIONES ARTICULARES / LESIONES -->
+                  <div class="chip-section-group">
+                    <label class="field-label-modern">
+                      <span>Restricciones Articulares / Lesiones</span>
+                      <small class="label-hint">Selecciona zonas a proteger</small>
+                    </label>
+                    <div class="chips-container">
+                      @for (rest of restriccionesOpciones; track rest.id) {
+                        <button
+                          type="button"
+                          class="chip-toggle warning-chip"
+                          [class.active]="restriccionesSeleccionadas().includes(rest.id)"
+                          (click)="toggleRestriccion(rest.id)"
+                        >
+                          <span class="chip-indicator"></span>
+                          <span>{{ rest.label }}</span>
+                        </button>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <!-- COLUMNA DERECHA: EQUIPAMIENTO & MULTIMEDIA -->
+                <div class="ia-col-section">
+                  <div class="section-badge-header">
+                    <span class="step-badge">Paso 2</span>
+                    <h4 class="section-title-text">Equipamiento & Captura Biomecánica</h4>
+                  </div>
+
+                  <!-- SELECTOR DE EQUIPAMIENTO POR CHIPS -->
+                  <div class="chip-section-group">
+                    <label class="field-label-modern">
+                      <span>Equipamiento Disponible en el Gimnasio</span>
+                      <small class="label-hint">Haz clic para activar o desactivar</small>
+                    </label>
+                    <div class="chips-container equipment-grid">
+                      @for (eq of equipamientoOpciones; track eq.id) {
+                        <button
+                          type="button"
+                          class="chip-toggle equipment-chip"
+                          [class.active]="equipamientoSeleccionado().includes(eq.id)"
+                          (click)="toggleEquipamiento(eq.id)"
+                        >
+                          <span class="chip-check-icon">
+                            @if (equipamientoSeleccionado().includes(eq.id)) { ✓ } @else { + }
+                          </span>
+                          <span>{{ eq.label }}</span>
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- SUBIDA DE ARCHIVOS MULTIMEDIA -->
+                  <div class="multimedia-section">
+                    <label class="field-label-modern">
+                      <span>Fotografías Posturales (MediaPipe 33-Landmarks)</span>
+                      <small class="label-hint">Opcional para análisis sagital y frontal</small>
+                    </label>
+
+                    <div class="photo-dropzones-grid">
+                      <!-- FOTO FRONTAL -->
+                      <div class="dropzone-box" [class.has-file]="!!fotoFrontalNombre()">
+                        <input type="file" id="fotoFrontal" accept="image/*" class="hidden-file-input" (change)="onFotoSelected($event, 'frontal')" />
+                        <label for="fotoFrontal" class="dropzone-label">
+                          <span class="dz-icon">FOTO</span>
+                          <span class="dz-title">Frontal</span>
+                          @if (fotoFrontalNombre()) {
+                            <span class="dz-filename" [title]="fotoFrontalNombre()">{{ fotoFrontalNombre() }}</span>
+                            <button type="button" class="btn-clear-dz" (click)="$event.preventDefault(); quitarFoto('frontal')" title="Eliminar">✕</button>
+                          } @else {
+                            <span class="dz-cta">Subir foto</span>
+                          }
+                        </label>
+                      </div>
+
+                      <!-- FOTO LATERAL -->
+                      <div class="dropzone-box" [class.has-file]="!!fotoLateralNombre()">
+                        <input type="file" id="fotoLateral" accept="image/*" class="hidden-file-input" (change)="onFotoSelected($event, 'lateral')" />
+                        <label for="fotoLateral" class="dropzone-label">
+                          <span class="dz-icon">FOTO</span>
+                          <span class="dz-title">Lateral</span>
+                          @if (fotoLateralNombre()) {
+                            <span class="dz-filename" [title]="fotoLateralNombre()">{{ fotoLateralNombre() }}</span>
+                            <button type="button" class="btn-clear-dz" (click)="$event.preventDefault(); quitarFoto('lateral')" title="Eliminar">✕</button>
+                          } @else {
+                            <span class="dz-cta">Subir foto</span>
+                          }
+                        </label>
+                      </div>
+
+                      <!-- FOTO POSTERIOR -->
+                      <div class="dropzone-box" [class.has-file]="!!fotoPosteriorNombre()">
+                        <input type="file" id="fotoPosterior" accept="image/*" class="hidden-file-input" (change)="onFotoSelected($event, 'posterior')" />
+                        <label for="fotoPosterior" class="dropzone-label">
+                          <span class="dz-icon">FOTO</span>
+                          <span class="dz-title">Posterior</span>
+                          @if (fotoPosteriorNombre()) {
+                            <span class="dz-filename" [title]="fotoPosteriorNombre()">{{ fotoPosteriorNombre() }}</span>
+                            <button type="button" class="btn-clear-dz" (click)="$event.preventDefault(); quitarFoto('posterior')" title="Eliminar">✕</button>
+                          } @else {
+                            <span class="dz-cta">Subir foto</span>
+                          }
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- VIDEO DROPZONE -->
+                    <div class="video-uploader-wrapper">
+                      <div class="form-row two-col" style="align-items: flex-end;">
+                        <div class="video-dropzone-box" [class.has-file]="!!videoNombre()">
+                          <input type="file" id="videoEj" accept="video/mp4,video/quicktime,video/avi" class="hidden-file-input" (change)="onVideoSelected($event)" />
+                          <label for="videoEj" class="video-dz-label">
+                            <span class="dz-icon">VIDEO</span>
+                            <div class="video-dz-text">
+                              <span class="dz-title">Video de Repeticiones</span>
+                              @if (videoNombre()) {
+                                <span class="dz-filename">{{ videoNombre() }}</span>
+                              } @else {
+                                <span class="dz-cta">Cargar MP4 / MOV para medir cadencia y profundidad</span>
+                              }
+                            </div>
+                            @if (videoNombre()) {
+                              <button type="button" class="btn-clear-dz" (click)="$event.preventDefault(); quitarVideo()" title="Eliminar">✕</button>
+                            }
+                          </label>
+                        </div>
+
+                        <div class="form-group-modern" style="flex: 0 0 200px;">
+                          <label class="field-label-modern">Ejercicio en Video</label>
+                          <select class="form-select-modern" [(ngModel)]="iaForm.tipoVideo" name="tipoVideo">
+                            <option value="SQUAT">Sentadilla (Squat)</option>
+                            <option value="PUSHUP">Flexiones (Push-up)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+                <!-- BOTÓN DE ACCIÓN PRINCIPAL CON EFECTO NEÓN -->
+                <div class="ia-submit-bar">
+                  <button type="submit" class="btn-ia-execute" [disabled]="iaLoading()">
+                    @if (iaLoading()) {
+                      <div class="spinner-inline"></div>
+                      <span>Procesando MediaPipe Pose & Red Neuronal CF...</span>
+                    } @else {
+                      <span class="btn-text">Ejecutar Pipeline de IA & Generar Prescripción Adaptativa</span>
+                      <span class="btn-arrow">→</span>
+                    }
+                  </button>
+
+                  @if (resultadoIa()) {
+                    <button type="button" class="btn-subtab-next" (click)="setIaSubTab('diagnostico')">
+                      <span>Ver Diagnóstico Generado</span>
+                      <span>→</span>
+                    </button>
+                  }
+                </div>
+              </form>
+            </div>
+          }
+
+          <!-- RESULTADOS DE LA EVALUACIÓN DE IA -->
+          @if (resultadoIa(); as res) {
+            <!-- PESTAÑA 2: DIAGNÓSTICO BIOMÉCANICO & CINEMÁTICO -->
+            @if (iaActiveSubTab() === 'diagnostico') {
+              <div class="ia-card results-card-modern">
+                <div class="results-header-modern">
+                  <div class="badge-title-group">
+                    <span class="pulse-indicator"></span>
+                    <h3 class="card-title-modern">Diagnóstico Biomecánico & Cinemático</h3>
+                  </div>
+                  <span class="engine-badge">
+                    <span class="chip-dot"></span>
+                    Motor: {{ res.recommendation_engine }}
+                  </span>
+                </div>
+
+                <!-- HUD STATS ROW -->
+                <div class="hud-metrics-row">
+                  <div class="hud-stat-box">
+                    <span class="hud-label">IMC Calculado</span>
+                    <div class="hud-main-val">
+                      <span class="hud-number">{{ res.bmi }}</span>
+                      <span class="imc-pill-modern" [ngClass]="obtenerClaseIMC(res.bmi)">
+                        {{ res.bmi_category }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="hud-stat-box">
+                    <span class="hud-label">Perfil Fisiológico</span>
+                    <div class="hud-main-val">
+                      <span class="hud-text-val">{{ res.fitness_level }}</span>
+                      <span class="hud-sub-badge">{{ res.fitness_goal }}</span>
+                    </div>
+                  </div>
+
+                  @if (res.video_analysis; as vid) {
+                    <div class="hud-stat-box highlight-stat">
+                      <span class="hud-label">Puntaje Técnico Video</span>
+                      <div class="hud-main-val">
+                        <span class="hud-number score-val">{{ vid.execution_score }}</span>
+                        <span class="hud-unit">/ 100</span>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- HALLAZGOS VISUALES OBSERVADOS -->
+                @if (res.posture_findings && res.posture_findings.length > 0) {
+                  <div class="findings-box-modern">
+                    <div class="findings-header">
+                      <h4 class="findings-title-modern">Hallazgos Posturales Detectados (MediaPipe 33-Landmarks)</h4>
+                    </div>
+                    <div class="findings-tags-list">
+                      @for (f of res.posture_findings; track f) {
+                        <div class="finding-badge">
+                          <span class="f-dot"></span>
+                          <span>{{ f }}</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <!-- ANÁLISIS DE VIDEO SI EXISTE -->
+                @if (res.video_analysis; as vid) {
+                  <div class="video-result-box-modern">
+                    <div class="video-box-header">
+                      <h4 class="video-box-title">Cinemática en Video: {{ vid.exercise_type }}</h4>
+                    </div>
+
+                    <div class="video-metrics-pills">
+                      <div class="video-pill">
+                        <span class="vp-label">Reps Válidas</span>
+                        <strong class="vp-val">{{ vid.completed_reps }}</strong>
+                      </div>
+                      <div class="video-pill">
+                        <span class="vp-label">Ángulo de Profundidad</span>
+                        <strong class="vp-val">{{ vid.average_depth_angle }}°</strong>
+                      </div>
+                      <div class="video-pill">
+                        <span class="vp-label">Calidad de Movimiento</span>
+                        <strong class="vp-val">{{ vid.execution_score }}/100</strong>
+                      </div>
+                    </div>
+
+                    @if (vid.execution_errors.length > 0) {
+                      <div class="video-errors-wrapper">
+                        <span class="errors-header-title">Oportunidades de Corrección Técnica:</span>
+                        <div class="errors-chips-list">
+                          @for (err of vid.execution_errors; track err) {
+                            <span class="error-chip">• {{ err }}</span>
+                          }
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- NAVEGACIÓN INFERIOR DE PESTAÑAS -->
+                <div class="subtab-footer-actions">
+                  <button type="button" class="btn-subtab-prev" (click)="setIaSubTab('parametros')">
+                    ← Modificar Parámetros
+                  </button>
+                  <button type="button" class="btn-subtab-next" (click)="setIaSubTab('plan')">
+                    Revisar Plan Semanal Adaptativo →
+                  </button>
+                </div>
+              </div>
+            }
+
+            <!-- PESTAÑA 3: PLAN ADAPTATIVO & APROBACIÓN HITL -->
+            @if (iaActiveSubTab() === 'plan') {
+              <div class="ia-card plan-approval-card-modern">
+                <div class="plan-hero-header">
+                  <div>
+                    <div class="plan-status-row">
+                      <span class="pending-pill-modern">Revisión Obligatoria: {{ res.workout_plan.status }}</span>
+                      <span class="guardrail-badge">Human-in-the-Loop Activo</span>
+                    </div>
+                    <h3 class="plan-main-title">{{ res.workout_plan.program_name }}</h3>
+                  </div>
+
+                  <button class="btn-approve-modern" [disabled]="iaLoading()" (click)="aprobarPlanIa()">
+                    <span class="btn-check">✓</span>
+                    <span>Aprobar & Asignar Rutina al Socio</span>
+                  </button>
+                </div>
+
+                <div class="hitl-banner">
+                  <div class="hitl-text">
+                    <strong>Aviso para el Preparador Físico:</strong>
+                    <p>{{ res.workout_plan.trainer_review_notice }}</p>
+                  </div>
+                </div>
+
+                <div class="justification-card">
+                  <span class="j-label">Justificación Algorítmica (Neural CF):</span>
+                  <p class="j-text">{{ res.workout_plan.justification }}</p>
+                </div>
+
+                <!-- DÍAS Y EJERCICIOS DEL PLAN -->
+                <div class="workout-days-grid">
+                  @for (dia of res.workout_plan.days; track dia.day_number) {
+                    <div class="day-card-modern">
+                      <div class="day-card-header">
+                        <h4 class="day-label-text">{{ dia.day_label }}</h4>
+                        <span class="day-badge-count">{{ dia.exercises.length }} ejercicios</span>
+                      </div>
+
+                      <div class="table-responsive">
+                        <table class="data-table modern-table">
+                          <thead>
+                            <tr>
+                              <th>Ejercicio</th>
+                              <th>Series</th>
+                              <th>Reps</th>
+                              <th>Descanso</th>
+                              <th>RPE</th>
+                              <th>Notas Biomecánicas</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (ex of dia.exercises; track ex.exercise_id) {
+                              <tr>
+                                <td><strong class="exercise-title-cell">{{ ex.exercise_name }}</strong></td>
+                                <td><span class="pill-metric highlight">{{ ex.target_sets }}</span></td>
+                                <td><span class="pill-metric">{{ ex.target_reps }}</span></td>
+                                <td><span class="pill-metric-dim">{{ ex.rest_seconds }}s</span></td>
+                                <td><span class="rpe-tag">RPE {{ ex.intensity_rpe }}</span></td>
+                                <td class="notes-cell">{{ ex.notes || 'Control excéntrico 2s' }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <!-- NAVEGACIÓN INFERIOR DE PESTAÑAS -->
+                <div class="subtab-footer-actions">
+                  <button type="button" class="btn-subtab-prev" (click)="setIaSubTab('diagnostico')">
+                    ← Volver al Diagnóstico
+                  </button>
+                  <button class="btn-approve-modern" [disabled]="iaLoading()" (click)="aprobarPlanIa()">
+                    <span class="btn-check">✓</span>
+                    <span>Aprobar & Asignar Rutina</span>
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
       </section>
     }
   </main>
