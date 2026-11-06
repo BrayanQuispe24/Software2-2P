@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { ShellSidebar } from './ShellSidebar';
 import { ShellHeader } from './ShellHeader';
+import { ConnectivityBanner } from '../../features/offline/ConnectivityBanner';
+import { ConflictResolverModal } from '../../features/offline/ConflictResolverModal';
 import './styles/shell-layout.css';
 
 export const ShellLayout: React.FC = () => {
@@ -32,11 +34,13 @@ export const ShellLayout: React.FC = () => {
 
       {/* Área principal de contenido */}
       <div className="shell-main-area">
+        <ConnectivityBanner />
         <ShellHeader onToggleSidebar={toggleMobileSidebar} />
 
         <main id="microfrontend-container">
           <Outlet />
         </main>
+        <ConflictResolverModal />
       </div>
     </div>
   );

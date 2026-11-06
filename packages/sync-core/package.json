@@ -1,0 +1,14 @@
+{
+  "name": "@platform/sync-core",
+  "version": "1.0.0",
+  "description": "Shared Offline-First Synchronization Engine with IndexedDB, Web Crypto and Idempotency",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["offline-first", "indexeddb", "pwa", "sync", "idempotency"],
+  "license": "UNLICENSED"
+}
+

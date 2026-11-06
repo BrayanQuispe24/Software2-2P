@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="36" fill="#0f172a"/>
+  <circle cx="96" cy="96" r="70" fill="url(#grad)" opacity="0.2"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <!-- Apex A / Lightning Bolt Logo -->
+  <path d="M96 36 L140 148 L114 148 L103 120 L89 120 L78 148 L52 148 Z M96 68 L84 104 L108 104 Z" fill="url(#grad)" />
+  <circle cx="140" cy="52" r="12" fill="#22c55e" />
+</svg>
+

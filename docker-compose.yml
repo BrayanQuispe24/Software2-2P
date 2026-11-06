@@ -85,6 +85,20 @@ services:
       - fitness-network
 
   # ==========================================
+  # CACHÉ E IDEMPOTENCIA
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: global-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - data-redis:/data
+    networks:
+      - fitness-network
+
+  # ==========================================
   # AUTENTICACIÓN Y GATEWAY
   # ==========================================
   ms-auth:
@@ -121,8 +135,11 @@ services:
       OIDC_REDIRECT_URI: http://localhost:3000/auth/callback
       SESSION_SECRET: ${SESSION_SECRET:-example_session_secret_at_least_32_characters_long}
       FRONTEND_URL: http://localhost:5173
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       - ms-auth
+      - redis
     networks:
       - fitness-network
 
@@ -247,11 +264,32 @@ services:
     networks:
       - fitness-network
 
+  # ==========================================
+  # REVERSE PROXY UNIFICADOR (SAME-ORIGIN PWA)
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: global-nginx-pwa
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - shell
+      - api-gateway
+      - mfe-entrenamiento
+      - mfe-gimnasio
+      - mfe-inventario
+    networks:
+      - fitness-network
+
 volumes:
   data-auth:
   data-gimnasio:
   data-inventario:
   data-entrenamiento:
+  data-redis:
 
 networks:
   fitness-network:

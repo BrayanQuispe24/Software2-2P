@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu, ChevronRight } from 'lucide-react';
+import { ConnectivityPill } from '../../features/offline/ConnectivityBanner';
 
 interface ShellHeaderProps {
   onToggleSidebar: () => void;
@@ -45,6 +46,7 @@ export const ShellHeader: React.FC<ShellHeaderProps> = ({ onToggleSidebar }) => 
       </div>
 
       <div className="shell-header-right">
+        <ConnectivityPill />
         <div className="sso-status-pill" title="Sesión validada con el Gateway">
           <span className="sso-status-dot" />
           <span>SSO Activo</span>
