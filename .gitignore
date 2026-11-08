@@ -10,12 +10,17 @@
 # --- Artefactos de Compilación y Bundles ---
 **/dist/
 **/build/
-**/out/
 **/target/
 **/.angular/
 **/.tsbuildinfo
 *.tsbuildinfo
 **/.mvn/wrapper/maven-wrapper.jar
+
+# Proteger código fuente de Arquitectura Hexagonal (Ports & Adapters)
+!**/ports/out/**
+!**/adapters/out/**
+!**/Ports/Out/**
+!**/Adapters/Out/**
 
 # --- Variables de Entorno y Secretos ---
 **/.env
@@ -23,8 +28,10 @@
 !**/.env.example
 
 # --- Certificados y Llaves Criptográficas ---
-**/keys/
+**/keys/*
+!**/keys/.gitkeep
 **/*.jwks.json
+!**/*.jwks.json.example
 **/*.pem
 **/*.key
 **/*.pfx
@@ -39,17 +46,20 @@ ms-entrenamiento/storage/framework/sessions/*
 !ms-entrenamiento/storage/framework/sessions/.gitignore
 ms-entrenamiento/storage/framework/views/*
 !ms-entrenamiento/storage/framework/views/.gitignore
+ms-entrenamiento/storage/logs/*
+!ms-entrenamiento/storage/logs/.gitignore
 ms-inventario/storage/framework/cache/*
 !ms-inventario/storage/framework/cache/.gitignore
 ms-inventario/storage/framework/sessions/*
 !ms-inventario/storage/framework/sessions/.gitignore
 ms-inventario/storage/framework/views/*
 !ms-inventario/storage/framework/views/.gitignore
+ms-inventario/storage/logs/*
+!ms-inventario/storage/logs/.gitignore
 **/.phpunit.result.cache
 
 # --- Logs y Procesos ---
 **/*.log
-**/logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

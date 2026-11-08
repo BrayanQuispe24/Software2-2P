@@ -46,7 +46,8 @@ lerna-debug.log*
 .env.local
 
 # cryptographic keys
-/keys/
+/keys/*
+!/keys/.gitkeep
 
 # temp directory
 .temp

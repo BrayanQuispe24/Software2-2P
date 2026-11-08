@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Configuration } from 'oidc-provider';
 import type { PrismaService } from '../prisma/prisma.service.js';
@@ -61,6 +61,12 @@ export function createOidcConfig(prisma: PrismaService): Configuration {
   const keyPath = resolve(
     process.env.OIDC_JWKS_FILE ?? 'keys/oidc-private.jwks.json',
   );
+  if (!existsSync(keyPath)) {
+    throw new Error(
+      `[MS-AUTH] No se encontró el archivo de claves JWKS en: '${keyPath}'. ` +
+        `Ejecuta 'node scripts/generate-oidc-keys.mjs' o configura OIDC_JWKS_FILE.`,
+    );
+  }
   const jwks = JSON.parse(readFileSync(keyPath, 'utf8'));
 
   return {
