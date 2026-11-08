@@ -6,6 +6,7 @@ import { DashboardPage } from './features/auth/presentation/pages/DashboardPage'
 import { InstructorPage } from './features/auth/presentation/pages/InstructorPage';
 import { ForbiddenPage } from './features/auth/presentation/pages/ForbiddenPage';
 import { UsersManagementPage } from './features/users/presentation/pages/UsersManagementPage';
+import { MonitoreoInteligentePage } from './features/agentes/presentation/pages/MonitoreoInteligentePage';
 import { PortalSocioPage } from './features/portal-socio/presentation/pages/PortalSocioPage';
 import { LandingPage } from './features/landing';
 import { MicrofrontendHost } from './app/microfrontends/MicrofrontendHost';
@@ -52,6 +53,15 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR']}>
                   <UsersManagementPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/monitoreo-inteligente"
+              element={
+                <ProtectedRoute allowedRoles={['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR']}>
+                  <MonitoreoInteligentePage />
                 </ProtectedRoute>
               }
             />

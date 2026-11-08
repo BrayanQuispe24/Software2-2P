@@ -4,6 +4,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersGatewayModule } from './users/users-gateway.module.js';
 import { IaGatewayModule } from './ia/ia-gateway.module.js';
+import { AgentesGatewayModule } from './agentes/agentes-gateway.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { HealthController } from './common/controllers/health.controller.js';
@@ -17,6 +18,7 @@ import { IdempotencyInterceptor } from './common/interceptors/idempotency.interc
     AuthModule,
     UsersGatewayModule,
     IaGatewayModule,
+    AgentesGatewayModule,
   ],
   controllers: [AppController, HealthController],
   providers: [

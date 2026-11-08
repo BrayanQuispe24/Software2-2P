@@ -9,6 +9,7 @@ import {
   Layers,
   Wrench,
   UserCheck,
+  Activity,
 } from 'lucide-react';
 import { useSessionQuery } from '../../features/auth/presentation/hooks/useSessionQuery';
 import { ssoAuthService } from '../../shared/auth/ssoAuthService';
@@ -43,6 +44,14 @@ const SYSTEM_MODULES: NavItem[] = [
     icon: Users,
     roles: ['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR'],
     badge: 'Core',
+    badgeType: 'native',
+  },
+  {
+    name: 'Monitoreo Inteligente',
+    path: '/admin/monitoreo-inteligente',
+    icon: Activity,
+    roles: ['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR'],
+    badge: 'IA CU-23',
     badgeType: 'native',
   },
 ];

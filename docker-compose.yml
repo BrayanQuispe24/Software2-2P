@@ -13,7 +13,7 @@ services:
       POSTGRES_PASSWORD: auth_dev_password
       POSTGRES_DB: ms_auth_db
     ports:
-      - "5433:5432"
+      - "5437:5432"
     volumes:
       - data-auth:/var/lib/postgresql/data
     healthcheck:
@@ -84,6 +84,26 @@ services:
     networks:
       - fitness-network
 
+  db-agentes:
+    image: postgres:17-alpine
+    container_name: global-db-agentes
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentes_user
+      POSTGRES_PASSWORD: agentes_dev_password
+      POSTGRES_DB: ms_agentes_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - data-agentes:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentes_user -d ms_agentes_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fitness-network
+
   # ==========================================
   # CACHÉ E IDEMPOTENCIA
   # ==========================================
@@ -137,9 +157,11 @@ services:
       FRONTEND_URL: http://localhost:5173
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      AGENTES_SERVICE_URL: http://ms-agentes:8085/api/v1
     depends_on:
       - ms-auth
       - redis
+      - ms-agentes
     networks:
       - fitness-network
 
@@ -218,6 +240,31 @@ services:
       - fitness-network
 
   # ==========================================
+  # AGENTE INTELIGENTE AUTÓNOMO (CU-23)
+  # ==========================================
+  ms-agentes:
+    build:
+      context: ./ms-agentes
+      dockerfile: Dockerfile
+    container_name: global-ms-agentes
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      DATABASE_URL: postgresql://agentes_user:agentes_dev_password@db-agentes:5432/ms_agentes_db
+      PORT: 8085
+      GYM_SERVICE_URL: http://ms-gimnasio:8082
+      INVENTARIO_SERVICE_URL: http://ms-inventario:8084
+      ENTRENAMIENTO_SERVICE_URL: http://ms-entrenamiento:8083
+      ML_SERVICE_URL: http://host.docker.internal:8000
+      N8N_WEBHOOK_URL: http://host.docker.internal:5678/webhook/agente-alerta
+    depends_on:
+      db-agentes:
+        condition: service_healthy
+    networks:
+      - fitness-network
+
+  # ==========================================
   # CAPA DE FRONTEND (SHELL & MICROFRONTENDS)
   # ==========================================
   shell:
@@ -289,6 +336,7 @@ volumes:
   data-gimnasio:
   data-inventario:
   data-entrenamiento:
+  data-agentes:
   data-redis:
 
 networks:

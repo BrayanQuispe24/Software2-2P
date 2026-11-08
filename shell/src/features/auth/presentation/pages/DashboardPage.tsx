@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Award, Users, UserCheck, QrCode, FileText, Dumbbell, Wrench } from 'lucide-react';
+import { Award, Users, UserCheck, QrCode, FileText, Dumbbell, Wrench, Activity } from 'lucide-react';
 import { useSessionQuery } from '../hooks/useSessionQuery';
 
 export function DashboardPage() {
@@ -70,15 +70,27 @@ export function DashboardPage() {
               )}
 
               {canAccessUsers && (
-                <Link to="/admin/users" className="module-link">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Users size={18} style={{ color: 'var(--accent)' }} />
-                    <span>{roles.includes('INSTRUCTOR') && !roles.includes('ADMINISTRADOR') && !roles.includes('RECEPCIONISTA') ? 'Directorio de Clientes' : 'Gestión de Usuarios (Backoffice)'}</span>
-                  </span>
-                  <span className="badge badge-mini">
-                    {roles.includes('INSTRUCTOR') && !roles.includes('ADMINISTRADOR') && !roles.includes('RECEPCIONISTA') ? 'INSTRUCTOR' : 'ADMINISTRADOR | RECEPCIONISTA'}
-                  </span>
-                </Link>
+                <>
+                  <Link to="/admin/users" className="module-link">
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Users size={18} style={{ color: 'var(--accent)' }} />
+                      <span>{roles.includes('INSTRUCTOR') && !roles.includes('ADMINISTRADOR') && !roles.includes('RECEPCIONISTA') ? 'Directorio de Clientes' : 'Gestión de Usuarios (Backoffice)'}</span>
+                    </span>
+                    <span className="badge badge-mini">
+                      {roles.includes('INSTRUCTOR') && !roles.includes('ADMINISTRADOR') && !roles.includes('RECEPCIONISTA') ? 'INSTRUCTOR' : 'ADMINISTRADOR | RECEPCIONISTA'}
+                    </span>
+                  </Link>
+
+                  <Link to="/admin/monitoreo-inteligente" className="module-link" style={{ borderLeft: '3px solid #818cf8' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Activity size={18} style={{ color: '#818cf8' }} />
+                      <span>Centro de Monitoreo Inteligente (CU-23)</span>
+                    </span>
+                    <span className="badge badge-mini" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
+                      IA AUTÓNOMA
+                    </span>
+                  </Link>
+                </>
               )}
 
               {canAccessGimnasio && (

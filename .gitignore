@@ -47,6 +47,21 @@ ms-inventario/storage/framework/views/*
 !ms-inventario/storage/framework/views/.gitignore
 **/.phpunit.result.cache
 
+# --- Python / FastAPI (ms-agentes) ---
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+**/*.sqlite3
+**/*.db
+**/.venv/
+**/venv/
+**/env/
+
 # --- Logs y Procesos ---
 **/*.log
 **/logs/

@@ -97,6 +97,7 @@ flowchart TD
 | **`ms-gimnasio`** | Microservicio Dominio| Spring Boot 3, Java 21, Flyway, GraphQL | `8082` | `5432` |
 | **`ms-entrenamiento`**| Microservicio Dominio| Laravel 11, PHP 8.2, Lighthouse GraphQL | `8083` | `5435` |
 | **`ms-inventario`** | Microservicio Dominio| Laravel 11, PHP 8.2, Lighthouse GraphQL | `8084` | `5434` |
+| **`ms-agentes`** | Agente Inteligente (CU-23) | Python 3.12, FastAPI, Hexagonal, IA Local WebGPU | `8085` | `5436` |
 
 ---
 
