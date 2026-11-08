@@ -7,18 +7,23 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/generate-oidc-keys.mjs",
     "build": "nest build",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "prestart": "node scripts/generate-oidc-keys.mjs",
     "start": "nest start",
+    "prestart:dev": "node scripts/generate-oidc-keys.mjs",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
     "lint": "oxlint src/ test/",
+    "pretest": "node scripts/generate-oidc-keys.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
+    "pretest:e2e": "node scripts/generate-oidc-keys.mjs",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
   },
   "dependencies": {
