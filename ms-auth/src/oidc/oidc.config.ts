@@ -70,7 +70,6 @@ export function createOidcConfig(prisma: PrismaService): Configuration {
   const jwks = JSON.parse(readFileSync(keyPath, 'utf8'));
 
   return {
-    proxy: true,
     conformIdTokenClaims: false,
     clients: [
       {

@@ -19,7 +19,11 @@ export class OidcInteractionController {
     @InjectOidcProvider() private readonly provider: Provider,
     private readonly loginService: LoginService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    // Activa el modo proxy en la instancia de oidc-provider (Koa context)
+    // para que reconozca los encabezados X-Forwarded-Proto y X-Forwarded-Host
+    this.provider.proxy = true;
+  }
 
   @Get(':uid')
   async getInteraction(
