@@ -1,10 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import express from 'express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Permitir que Express confíe en proxies inversos (Nginx, Cloudflare, etc.)
+  // para que req.protocol, req.secure y las cabeceras X-Forwarded-* (https, host) se respeten
+  app.set('trust proxy', 1);
 
   app.use(express.urlencoded({ extended: true }));
   app.use(express.json());
