@@ -41,7 +41,17 @@ spring:
 jwt:
   secret: ${JWT_SECRET:SUPER_SECRET_KEY_FOR_DEV_JWT_APEX_FITNESS_SSO_2026}
 
+aws:
+  region: ${AWS_REGION:us-east-1}
+  dynamodb:
+    endpoint: ${AWS_DYNAMODB_ENDPOINT:http://localhost:8005}
+    access-key-id: ${AWS_ACCESS_KEY_ID:local}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:local}
+    table-name: ${DYNAMODB_TABLE_NAME:apex_registro_accesos}
+
 gym:
   security:
     qr-secret: ${GYM_QR_SECRET:ApexFitnessGymSecureQrHmacKey2026!}
     anti-passback-minutes: 10
+  access:
+    storage-driver: ${GYM_ACCESS_STORAGE_DRIVER:dynamodb}

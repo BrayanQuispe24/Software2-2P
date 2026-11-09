@@ -17,7 +17,20 @@
 	<properties>
 		<java.version>21</java.version>
 		<graphql-extended-scalars.version>22.0</graphql-extended-scalars.version>
+		<awssdk.version>2.29.15</awssdk.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${awssdk.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 		<!-- Spring for GraphQL (Schema-First) -->
@@ -52,6 +65,12 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+
+		<!-- NoSQL: AWS SDK DynamoDB Enhanced Client -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>dynamodb-enhanced</artifactId>
 		</dependency>
 
 		<!-- Seguridad SSO: OAuth2 Resource Server / JWT -->

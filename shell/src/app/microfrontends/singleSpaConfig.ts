@@ -15,33 +15,39 @@ export interface MicrofrontendAppConfig {
  * Cuando los bundles remotos estén publicados en sus respectivos puertos,
  * single-spa los descargará y montará dinámicamente.
  */
+const env = (import.meta as unknown as { env?: Record<string, string> })?.env || {};
+const mfeEntrenamientoUrl = env['VITE_MFE_ENTRENAMIENTO_URL'] || 'http://localhost:9102';
+const mfeClientesUrl = env['VITE_MFE_CLIENTES_URL'] || 'http://localhost:9103';
+const mfeInventarioUrl = env['VITE_MFE_INVENTARIO_URL'] || 'http://localhost:9104';
+const mfeGimnasioUrl = env['VITE_MFE_GIMNASIO_URL'] || 'http://localhost:9105';
+
 export const REGISTERED_MFES: MicrofrontendAppConfig[] = [
   {
     name: '@plataforma/instructores',
     route: '/instructores',
     roles: ['ADMINISTRADOR', 'INSTRUCTOR'],
-    entryUrl: 'http://localhost:9102/main.js',
+    entryUrl: `${mfeEntrenamientoUrl}/main.js`,
     description: 'Módulo de gestión de clases, asistencias y rutinas de instructores',
   },
   {
     name: '@plataforma/clientes',
     route: '/clientes',
     roles: ['ADMINISTRADOR', 'CLIENTE'],
-    entryUrl: 'http://localhost:9103/plataforma-clientes.js',
+    entryUrl: `${mfeClientesUrl}/plataforma-clientes.js`,
     description: 'Portal de socios: membresías, reservas y código QR',
   },
   {
     name: '@plataforma/inventario',
     route: '/inventario',
     roles: ['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR'],
-    entryUrl: 'http://localhost:9104/main.js',
+    entryUrl: `${mfeInventarioUrl}/main.js`,
     description: 'Módulo de inventario, equipamiento, mantenimiento preventivo/correctivo y Kardex',
   },
   {
     name: '@plataforma/gimnasio',
     route: '/gimnasio',
     roles: ['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR'],
-    entryUrl: 'http://localhost:9105/main.js',
+    entryUrl: `${mfeGimnasioUrl}/main.js`,
     description: 'Módulo de gestión del gimnasio: inscripciones, pagos, planes, tarifas, disciplinas y torniquete',
   },
 ];

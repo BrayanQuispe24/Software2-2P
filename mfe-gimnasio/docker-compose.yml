@@ -3,7 +3,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mfe-gimnasio-app
+    container_name: global-mfe-gimnasio
     restart: unless-stopped
     ports:
       - "9105:9105"
+    environment:
+      - PORT=9105
+      - API_GIMNASIO_URL=${API_GIMNASIO_URL:-http://localhost:8082}
+    networks:
+      - fitness-network
+
+networks:
+  fitness-network:
+    external: true
+    name: ${FITNESS_NETWORK_NAME:-apex-fitness-platform_fitness-network}

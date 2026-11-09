@@ -19,6 +19,40 @@ services:
     networks:
       - ms-entrenamiento-net
 
+  # Persistencia NoSQL para rutinas, historiales y biomecánica
+  mongodb:
+    image: mongo:latest
+    container_name: ms-entrenamiento-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secretpassword
+      MONGO_INITDB_DATABASE: app_db
+    volumes:
+      - mongo_entrenamiento_data:/data/db
+    networks:
+      - ms-entrenamiento-net
+
+  # Interfaz web de administración MongoDB
+  mongo-express:
+    image: mongo-express:latest
+    container_name: ms-entrenamiento-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: secretpassword
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH_USERNAME: webuser
+      ME_CONFIG_BASICAUTH_PASSWORD: webpassword
+    depends_on:
+      - mongodb
+    networks:
+      - ms-entrenamiento-net
+
   ms-entrenamiento:
     build:
       context: .
@@ -38,14 +72,23 @@ services:
       DB_DATABASE: ms_entrenamiento_db
       DB_USERNAME: entrenamiento_user
       DB_PASSWORD: entrenamiento_dev_password
+      # Conexión a MongoDB
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: app_db
+      MONGO_USERNAME: admin
+      MONGO_PASSWORD: secretpassword
     depends_on:
       postgres:
         condition: service_healthy
+      mongodb:
+        condition: service_started
     networks:
       - ms-entrenamiento-net
 
 volumes:
   postgres_entrenamiento_data:
+  mongo_entrenamiento_data:
 
 networks:
   ms-entrenamiento-net:

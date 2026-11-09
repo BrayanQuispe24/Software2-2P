@@ -3,7 +3,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mfe-inventario-app
+    container_name: global-mfe-inventario
     restart: unless-stopped
     ports:
       - "9104:9104"
+    environment:
+      - PORT=9104
+      - GRAPHQL_INVENTARIO_URL=${GRAPHQL_INVENTARIO_URL:-http://localhost:8084/graphql}
+    networks:
+      - fitness-network
+
+networks:
+  fitness-network:
+    external: true
+    name: ${FITNESS_NETWORK_NAME:-apex-fitness-platform_fitness-network}

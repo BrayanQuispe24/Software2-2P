@@ -3,7 +3,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mfe-entrenamiento-app
+    container_name: global-mfe-entrenamiento
     restart: unless-stopped
     ports:
       - "9102:9102"
+    environment:
+      - PORT=9102
+      - GRAPHQL_ENDPOINT=${GRAPHQL_ENDPOINT:-http://localhost:8083/graphql}
+      - IA_API_ENDPOINT=${IA_API_ENDPOINT:-http://localhost:8000/api/v1}
+    networks:
+      - fitness-network
+
+networks:
+  fitness-network:
+    external: true
+    name: ${FITNESS_NETWORK_NAME:-apex-fitness-platform_fitness-network}
