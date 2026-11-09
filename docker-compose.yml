@@ -118,6 +118,7 @@ services:
     depends_on:
       db-auth:
         condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
     networks:
       - fitness-network
 
