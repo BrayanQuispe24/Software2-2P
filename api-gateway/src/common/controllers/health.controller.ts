@@ -1,7 +1,7 @@
 import { Controller, Get, Head, HttpCode, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 
-@Controller('health')
+@Controller(['health', 'api/health'])
 export class HealthController {
   @Head('ping')
   @HttpCode(HttpStatus.NO_CONTENT)

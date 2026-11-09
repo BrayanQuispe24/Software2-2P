@@ -3,7 +3,7 @@
  * Implementa Precaching del Shell, Stale-While-Revalidate y Soporte Offline.
  */
 
-const CACHE_NAME = 'apex-pwa-cache-v1';
+const CACHE_NAME = 'apex-pwa-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -51,6 +51,15 @@ self.addEventListener('fetch', (event) => {
 
   // Ignorar llamadas de extensiones del navegador
   if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // NUNCA interceptar ni cachear rutas de autenticación SSO/OIDC
+  if (
+    url.pathname.startsWith('/auth/') ||
+    url.pathname.startsWith('/oidc/') ||
+    url.pathname.startsWith('/interaction/')
+  ) {
     return;
   }
 

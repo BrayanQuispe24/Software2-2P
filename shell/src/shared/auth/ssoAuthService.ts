@@ -85,6 +85,10 @@ class SsoAuthService {
 
   async logout(): Promise<void> {
     try {
+      if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      }
       const response = await axiosClient.post<{ logoutUrl?: string }>('/auth/logout');
       this.currentUser = null;
       if (response.data?.logoutUrl) {

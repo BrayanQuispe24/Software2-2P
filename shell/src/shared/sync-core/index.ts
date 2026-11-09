@@ -1,5 +1,5 @@
 import { SyncCoreEngine } from './sync-engine';
-export type * from './types';
+export * from './types';
 export * from './crypto';
 export * from './db';
 export * from './heartbeat';

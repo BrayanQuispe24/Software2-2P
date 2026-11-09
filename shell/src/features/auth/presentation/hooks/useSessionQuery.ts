@@ -11,7 +11,7 @@ export function useSessionQuery() {
   return useQuery({
     queryKey: SESSION_QUERY_KEY,
     queryFn: () => getSessionUseCase.execute(),
-    staleTime: 1000 * 60 * 5, // 5 minutos de vigencia de caché
+    staleTime: 0,
     retry: false,
   });
 }
@@ -23,6 +23,7 @@ export function useAuthActions() {
     mutationFn: () => logoutUseCase.execute(),
     onSuccess: () => {
       queryClient.setQueryData(SESSION_QUERY_KEY, null);
+      queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
     },
   });
 
