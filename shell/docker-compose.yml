@@ -3,7 +3,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: shell-host-app
+    container_name: global-shell-host
     restart: unless-stopped
     ports:
       - "5173:5173"
+    environment:
+      - PORT=5173
+      - VITE_API_GATEWAY_URL=${VITE_API_GATEWAY_URL:-http://localhost:3000}
+      - VITE_MFE_ENTRENAMIENTO_URL=${VITE_MFE_ENTRENAMIENTO_URL:-http://localhost:9102}
+      - VITE_MFE_GIMNASIO_URL=${VITE_MFE_GIMNASIO_URL:-http://localhost:9105}
+      - VITE_MFE_INVENTARIO_URL=${VITE_MFE_INVENTARIO_URL:-http://localhost:9104}
+    networks:
+      - fitness-network
+
+networks:
+  fitness-network:
+    external: true
+    name: ${FITNESS_NETWORK_NAME:-apex-fitness-platform_fitness-network}

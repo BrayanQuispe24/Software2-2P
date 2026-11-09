@@ -8,6 +8,7 @@ import com.apexfitness.gimnasio.infrastructure.adapters.out.persistence.mapper.P
 import com.apexfitness.gimnasio.infrastructure.adapters.out.persistence.repository.SpringDataBoletaInscripcionRepository;
 import com.apexfitness.gimnasio.infrastructure.adapters.out.persistence.repository.SpringDataRegistroAccesoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "gym.access.storage-driver", havingValue = "postgres")
 public class RegistroAccesoRepositoryAdapter implements RegistroAccesoRepositoryPort {
 
     private final SpringDataRegistroAccesoRepository repository;

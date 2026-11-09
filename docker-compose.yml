@@ -119,6 +119,71 @@ services:
       - fitness-network
 
   # ==========================================
+  # PERSISTENCIA NOSQL: ACCESOS Y ENTRENAMIENTO
+  # ==========================================
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: global-dynamodb-local
+    user: root
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    volumes:
+      - data-dynamodb:/home/dynamodblocal/data
+    working_dir: /home/dynamodblocal
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    networks:
+      - fitness-network
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    container_name: global-dynamodb-admin
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb-local:8000
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    depends_on:
+      - dynamodb-local
+    networks:
+      - fitness-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: global-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secretpassword
+      MONGO_INITDB_DATABASE: app_db
+    volumes:
+      - data-mongodb:/data/db
+    networks:
+      - fitness-network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: global-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: secretpassword
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH_USERNAME: webuser
+      ME_CONFIG_BASICAUTH_PASSWORD: webpassword
+    depends_on:
+      - mongodb
+    networks:
+      - fitness-network
+
+  # ==========================================
   # AUTENTICACIÓN Y GATEWAY
   # ==========================================
   ms-auth:
@@ -189,9 +254,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: gym_dev_password
       JWT_SECRET: ${JWT_SECRET:-SUPER_SECRET_KEY_FOR_DEV_JWT_APEX_FITNESS_SSO_2026}
       GYM_QR_SECRET: ${GYM_QR_SECRET:-ApexFitnessGymSecureQrHmacKey2026!}
+      AWS_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      GYM_ACCESS_STORAGE_DRIVER: ${GYM_ACCESS_STORAGE_DRIVER:-dynamodb}
     depends_on:
       db-gimnasio:
         condition: service_healthy
+      dynamodb-local:
+        condition: service_started
     networks:
       - fitness-network
 
@@ -242,9 +314,16 @@ services:
       DB_DATABASE: ms_entrenamiento_db
       DB_USERNAME: entrenamiento_user
       DB_PASSWORD: entrenamiento_dev_password
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DATABASE: app_db
+      MONGO_USERNAME: admin
+      MONGO_PASSWORD: secretpassword
     depends_on:
       db-entrenamiento:
         condition: service_healthy
+      mongodb:
+        condition: service_started
     command: sh -c "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8083"
     networks:
       - fitness-network
@@ -349,6 +428,8 @@ volumes:
   data-entrenamiento:
   data-agentes:
   data-redis:
+  data-dynamodb:
+  data-mongodb:
 
 networks:
   fitness-network:

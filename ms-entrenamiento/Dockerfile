@@ -6,7 +6,7 @@ FROM php:8.4-cli-alpine
 
 WORKDIR /var/www/html
 
-# Instalar dependencias del sistema y extensiones de PHP para PostgreSQL
+# Instalar dependencias del sistema y extensiones de PHP para PostgreSQL y MongoDB
 RUN apk add --no-cache \
     postgresql-dev \
     libzip-dev \
@@ -16,9 +16,16 @@ RUN apk add --no-cache \
     curl \
     oniguruma-dev \
     libxml2-dev \
-    linux-headers
+    linux-headers \
+    autoconf \
+    gcc \
+    g++ \
+    make \
+    openssl-dev
 
-RUN docker-php-ext-install pdo pdo_pgsql pgsql mbstring zip bcmath
+RUN docker-php-ext-install pdo pdo_pgsql pgsql mbstring zip bcmath \
+    && pecl install mongodb \
+    && docker-php-ext-enable mongodb
 
 # Instalar Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

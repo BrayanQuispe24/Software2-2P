@@ -27,9 +27,12 @@ export interface UploadedFile {
 @Controller('api/ia')
 export class IaGatewayController {
   private readonly iaServiceUrl: string;
+  private readonly iaBaseUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    this.iaServiceUrl = this.config.get('IA_SERVICE_URL', 'http://localhost:8000/api/v1');
+    const rawUrl = (this.config.get<string>('IA_SERVICE_URL') || 'http://localhost:8000').trim().replace(/\/+$/, '');
+    this.iaBaseUrl = rawUrl.replace(/\/api\/v1\/?$/, '');
+    this.iaServiceUrl = `${this.iaBaseUrl}/api/v1`;
   }
 
   private validateAuth(req: Request) {
@@ -57,14 +60,13 @@ export class IaGatewayController {
   @Get('health')
   async healthCheck(@Res() res: Response) {
     try {
-      const baseUrl = this.iaServiceUrl.replace(/\/api\/v1\/?$/, '');
-      const response = await fetch(`${baseUrl}/health/ready`);
+      const response = await fetch(`${this.iaBaseUrl}/health/ready`);
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch {
       return res.status(HttpStatus.BAD_GATEWAY).json({
         status: 'unavailable',
-        message: 'El microservicio de Inteligencia Artificial (FastAPI) no responde en localhost:8000.',
+        message: `El microservicio de Inteligencia Artificial (FastAPI) no responde en ${this.iaBaseUrl}.`,
       });
     }
   }

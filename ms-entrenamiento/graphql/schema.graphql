@@ -66,6 +66,59 @@ type Rutina {
   rutinaEjercicios: [RutinaEjercicio!]! @hasMany(relation: "rutinaEjercicios")
 }
 
+# ----------------------------------------------------
+# Rutinas Personalizadas NoSQL (MongoDB)
+# ----------------------------------------------------
+
+type SerieDetalle {
+  set: Int!
+  repeticiones: Int
+  pesoKg: Float
+  rpeObjetivo: Float
+  duracionSegundos: Int
+  descansoSegundos: Int
+  nota: String
+}
+
+type EjercicioBloqueItem {
+  ejercicioId: ID
+  nombre: String!
+  series: Int
+  repeticiones: Int
+  pesoKg: Float
+  duracionSegundos: Int
+  descansoSegundos: Int
+  notaTecnica: String
+  seriesDetalle: [SerieDetalle!]
+}
+
+type BloqueEntrenamiento {
+  orden: Int!
+  nombre: String
+  tipoBloque: String!
+  metodo: String
+  protocolo: String
+  rondas: Int
+  intervaloTrabajoSeg: Int
+  intervaloDescansoSeg: Int
+  ejercicios: [EjercicioBloqueItem!]!
+}
+
+type RutinaPersonalizada {
+  id: ID!
+  usuarioId: ID!
+  nombre: String!
+  descripcion: String
+  objetivo: String!
+  tipoEntrenamiento: String!
+  nivel: String!
+  estado: String!
+  duracionEstimadaMinutos: Int
+  bloques: [BloqueEntrenamiento!]!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
 type PlanEntrenamientoRutina {
   id: ID!
   diaSemana: String! @rename(attribute: "dia_semana")
@@ -152,12 +205,21 @@ type Query {
   ): [Ejercicio!]! @all
   ejercicioPorId(id: ID! @eq): Ejercicio @find
 
-  # Rutinas
+  # Rutinas Relacionales (Legadas)
   rutinas(
     nivel: String @where
     estado: Boolean @where
   ): [Rutina!]! @all
   rutinaPorId(id: ID! @eq): Rutina @find
+
+  # Rutinas Personalizadas NoSQL (MongoDB)
+  rutinasPersonalizadasPorUsuario(
+    usuarioId: ID!
+  ): [RutinaPersonalizada!]! @field(resolver: "App\\GraphQL\\Queries\\RutinasPersonalizadasPorUsuarioQuery")
+
+  rutinaPersonalizadaPorId(
+    id: ID!
+  ): RutinaPersonalizada @field(resolver: "App\\GraphQL\\Queries\\RutinaPersonalizadaPorIdQuery")
 
   # Planes de Entrenamiento
   planesEntrenamiento(
@@ -288,12 +350,66 @@ input CrearHistorialInput {
   observacionesGenerales: String
 }
 
+input SerieDetalleInput {
+  set: Int!
+  repeticiones: Int
+  pesoKg: Float
+  rpeObjetivo: Float
+  duracionSegundos: Int
+  descansoSegundos: Int
+  nota: String
+}
+
+input EjercicioBloqueItemInput {
+  ejercicioId: ID
+  nombre: String!
+  series: Int
+  repeticiones: Int
+  pesoKg: Float
+  duracionSegundos: Int
+  descansoSegundos: Int
+  notaTecnica: String
+  seriesDetalle: [SerieDetalleInput!]
+}
+
+input BloqueEntrenamientoInput {
+  orden: Int!
+  nombre: String
+  tipoBloque: String!
+  metodo: String
+  protocolo: String
+  rondas: Int
+  intervaloTrabajoSeg: Int
+  intervaloDescansoSeg: Int
+  ejercicios: [EjercicioBloqueItemInput!]!
+}
+
+input GuardarRutinaPersonalizadaInput {
+  id: ID
+  usuarioId: ID!
+  nombre: String!
+  descripcion: String
+  objetivo: String!
+  tipoEntrenamiento: String!
+  nivel: String!
+  estado: String
+  duracionEstimadaMinutos: Int
+  bloques: [BloqueEntrenamientoInput!]!
+}
+
 type Mutation {
   crearEjercicio(input: CrearEjercicioInput!): Ejercicio!
     @field(resolver: "App\\GraphQL\\Mutations\\CrearEjercicioMutation")
 
   crearRutina(input: CrearRutinaInput!): Rutina!
     @field(resolver: "App\\GraphQL\\Mutations\\CrearRutinaMutation")
+
+  # Rutinas Personalizadas NoSQL (MongoDB)
+  guardarRutinaPersonalizada(input: GuardarRutinaPersonalizadaInput!): RutinaPersonalizada!
+    @field(resolver: "App\\GraphQL\\Mutations\\GuardarRutinaPersonalizadaMutation")
+
+  eliminarRutinaPersonalizada(id: ID!): Boolean!
+    @field(resolver: "App\\GraphQL\\Mutations\\EliminarRutinaPersonalizadaMutation")
 
   asignarPlanEntrenamiento(input: AsignarPlanEntrenamientoInput!): PlanEntrenamiento!
     @field(resolver: "App\\GraphQL\\Mutations\\AsignarPlanEntrenamientoMutation")
