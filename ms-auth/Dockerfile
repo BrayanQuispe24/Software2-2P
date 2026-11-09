@@ -10,6 +10,8 @@ WORKDIR /app
 # Instalar herramientas necesarias para compilación nativa si aplica
 RUN apk add --no-cache openssl python3 make g++
 
+ENV DATABASE_URL="postgresql://auth_user:auth_dev_password@db-auth:5432/ms_auth_db?schema=public"
+
 COPY package*.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
