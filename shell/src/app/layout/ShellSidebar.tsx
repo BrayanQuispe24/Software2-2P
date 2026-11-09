@@ -10,7 +10,8 @@ import {
   Wrench,
   UserCheck,
 } from 'lucide-react';
-import { useSessionQuery } from '../../features/auth/presentation/hooks/useSessionQuery';
+import { useSessionQuery, SESSION_QUERY_KEY } from '../../features/auth/presentation/hooks/useSessionQuery';
+import { useQueryClient } from '@tanstack/react-query';
 import { ssoAuthService } from '../../shared/auth/ssoAuthService';
 import type { Role } from '../../features/auth/domain/Role';
 
@@ -86,7 +87,11 @@ export const ShellSidebar: React.FC<ShellSidebarProps> = ({
   const { data: session } = useSessionQuery();
   const user = session?.user ?? ssoAuthService.getCurrentUser();
 
+  const queryClient = useQueryClient();
+
   const handleLogout = async () => {
+    queryClient.removeQueries({ queryKey: SESSION_QUERY_KEY });
+    queryClient.clear();
     await ssoAuthService.logout();
   };
 

@@ -78,11 +78,16 @@ export function createOidcConfig(prisma: PrismaService): Configuration {
         client_secret:
           process.env.OIDC_GATEWAY_SECRET ??
           '9f8e4c7b2a1d0f5e8c3b6a9d2e4f7a1c5b8e0d3f6a9c2e5b8d1f4a7c0e3b6d9f',
-        redirect_uris: ['http://localhost:3000/auth/callback'],
+        redirect_uris: [
+          'http://localhost:3000/auth/callback',
+          'http://localhost/auth/callback',
+        ],
         post_logout_redirect_uris: [
           'http://localhost:3000/',
           'http://localhost:5173/login',
           'http://localhost:5173',
+          'http://localhost/login',
+          'http://localhost',
         ],
         response_types: ['code'],
         grant_types: ['authorization_code', 'refresh_token'],

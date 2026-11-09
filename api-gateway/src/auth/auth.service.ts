@@ -42,19 +42,32 @@ export class AuthService implements OnModuleInit {
     const nonce = oidc.randomNonce();
     const redirectUri = this.config.getOrThrow<string>('OIDC_REDIRECT_URI');
 
-    const url = oidc.buildAuthorizationUrl(this.oidcConfig, {
-      redirect_uri: redirectUri,
-      scope: 'openid profile email api:read api:write offline_access',
-      response_type: 'code',
-      resource: 'urn:app:api',
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      state,
-      nonce,
-    });
+    const authUrl = new URL(
+      oidc.buildAuthorizationUrl(this.oidcConfig, {
+        redirect_uri: redirectUri,
+        scope: 'openid profile email api:read api:write offline_access',
+        response_type: 'code',
+        resource: 'urn:app:api',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        state,
+        nonce,
+      }).toString()
+    );
+
+    const publicAuthUrl = this.config.get<string>('PUBLIC_AUTH_URL');
+    if (publicAuthUrl) {
+      const parsedPublic = new URL(publicAuthUrl);
+      authUrl.protocol = parsedPublic.protocol;
+      authUrl.hostname = parsedPublic.hostname;
+      authUrl.port = parsedPublic.port;
+    } else if (authUrl.hostname === 'ms-auth') {
+      authUrl.hostname = 'localhost';
+      authUrl.port = '4000';
+    }
 
     return {
-      url: url.toString(),
+      url: authUrl.toString(),
       state,
       nonce,
       codeVerifier,
@@ -93,6 +106,17 @@ export class AuthService implements OnModuleInit {
     if (postLogoutRedirectUri) {
       params.post_logout_redirect_uri = postLogoutRedirectUri;
     }
-    return oidc.buildEndSessionUrl(this.oidcConfig, params).toString();
+    const logoutUrl = new URL(oidc.buildEndSessionUrl(this.oidcConfig, params).toString());
+    const publicAuthUrl = this.config.get<string>('PUBLIC_AUTH_URL');
+    if (publicAuthUrl) {
+      const parsedPublic = new URL(publicAuthUrl);
+      logoutUrl.protocol = parsedPublic.protocol;
+      logoutUrl.hostname = parsedPublic.hostname;
+      logoutUrl.port = parsedPublic.port;
+    } else if (logoutUrl.hostname === 'ms-auth') {
+      logoutUrl.hostname = 'localhost';
+      logoutUrl.port = '4000';
+    }
+    return logoutUrl.toString();
   }
 }

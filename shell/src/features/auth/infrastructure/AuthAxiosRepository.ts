@@ -54,6 +54,10 @@ export class AuthAxiosRepository implements AuthRepository {
 
   async logout(): Promise<void> {
     try {
+      if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      }
       const response = await this.httpClient.post<{ message: string; logoutUrl?: string }>('/auth/logout');
       if (response.data?.logoutUrl) {
         window.location.assign(response.data.logoutUrl);

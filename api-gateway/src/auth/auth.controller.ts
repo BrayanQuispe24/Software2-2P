@@ -29,8 +29,11 @@ export class AuthController {
       codeVerifier: auth.codeVerifier,
     };
 
+    console.log(`[LOGIN] SID=${req.sessionID} CookiesIn=${req.headers.cookie ?? 'none'} state=${auth.state}`);
+
     req.session.save((error) => {
       if (error) {
+        console.error('[LOGIN] Error saving session:', error);
         throw new InternalServerErrorException('Error al guardar sesión de autorización');
       }
       return res.redirect(auth.url);
@@ -39,8 +42,10 @@ export class AuthController {
 
   @Get('callback')
   async callback(@Req() req: Request, @Res() res: Response) {
+    console.log(`[CALLBACK] SID=${req.sessionID} CookiesIn=${req.headers.cookie ?? 'none'} HasPending=${Boolean(req.session.oidcPending)} Url=${req.originalUrl}`);
     const pending = req.session.oidcPending;
     if (!pending) {
+      console.warn(`[CALLBACK 401] No oidcPending found for session ${req.sessionID}`);
       throw new UnauthorizedException('No existe una autenticación pendiente o ya fue procesada');
     }
 
@@ -49,12 +54,18 @@ export class AuthController {
     const port = this.config.get('PORT', 3000);
     const callbackUrl = new URL(req.originalUrl, `http://localhost:${port}`);
 
-    const tokens = await this.authService.exchangeCode(
-      callbackUrl,
-      pending.codeVerifier,
-      pending.state,
-      pending.nonce,
-    );
+    let tokens;
+    try {
+      tokens = await this.authService.exchangeCode(
+        callbackUrl,
+        pending.codeVerifier,
+        pending.state,
+        pending.nonce,
+      );
+    } catch (err: any) {
+      console.error('[CALLBACK exchangeCode ERROR]', err?.message || err);
+      throw err;
+    }
 
     const claims = tokens.claims();
     if (!claims?.sub) {
@@ -143,15 +154,17 @@ export class AuthController {
       console.warn('No se pudo generar URL OIDC de logout:', e);
     }
 
+    const cookieSecure = this.config.get('COOKIE_SECURE') === 'true';
     req.session.destroy(() => {
-      res.clearCookie('gateway.sid', { path: '/', httpOnly: true, sameSite: 'lax' });
+      res.clearCookie('gateway.sid', { path: '/', httpOnly: true, secure: cookieSecure, sameSite: 'lax' });
       return res.redirect(logoutUrl);
     });
   }
 
   @Post('logout')
   async logout(@Req() req: Request, @Res() res: Response) {
-    const idToken = req.session.idToken;
+    console.log(`[LOGOUT POST] SID=${req.sessionID} CookiesIn=${req.headers.cookie ?? 'none'} idToken=${Boolean(req.session?.idToken)}`);
+    const idToken = req.session?.idToken;
     const frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:5173');
     const postLogoutRedirect = `${frontendUrl}/login`;
 
@@ -161,12 +174,15 @@ export class AuthController {
     } catch (e) {
       console.warn('No se pudo generar URL OIDC de logout:', e);
     }
+    console.log(`[LOGOUT POST] Generated logoutUrl: ${logoutUrl}`);
 
+    const cookieSecure = this.config.get('COOKIE_SECURE') === 'true';
     req.session.destroy((error) => {
       if (error) {
+        console.error('[LOGOUT POST] Error destroying session:', error);
         throw new InternalServerErrorException('No se pudo cerrar la sesión');
       }
-      res.clearCookie('gateway.sid', { path: '/', httpOnly: true, sameSite: 'lax' });
+      res.clearCookie('gateway.sid', { path: '/', httpOnly: true, secure: cookieSecure, sameSite: 'lax' });
       return res.status(200).json({
         message: 'Sesión local cerrada exitosamente',
         logoutUrl,

@@ -1,8 +1,8 @@
 # ==========================================
-# Dockerfile - MS Entrenamiento (PHP 8.2 / Laravel)
+# Dockerfile - MS Entrenamiento (PHP 8.4 / Laravel 13)
 # ==========================================
 
-FROM php:8.2-cli-alpine
+FROM php:8.4-cli-alpine
 
 WORKDIR /var/www/html
 

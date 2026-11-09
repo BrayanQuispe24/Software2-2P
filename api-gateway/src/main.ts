@@ -7,7 +7,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  const isProd = process.env.NODE_ENV === 'production';
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  const cookieSecure = config.get('COOKIE_SECURE') === 'true';
 
   app.use(
     session({
@@ -15,9 +18,10 @@ async function bootstrap() {
       secret: config.getOrThrow<string>('SESSION_SECRET'),
       resave: false,
       saveUninitialized: false,
+      proxy: true,
       cookie: {
         httpOnly: true,
-        secure: isProd,
+        secure: cookieSecure,
         sameSite: 'lax',
         maxAge: 8 * 60 * 60 * 1000,
       },

@@ -1,0 +1,7 @@
+vendor
+.git
+.vscode
+.agents
+.env
+
+

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSyncEngine } from '../../../../packages/sync-core/src';
-import type { SyncEngineStatus } from '../../../../packages/sync-core/src';
+import { getSyncEngine } from '../../shared/sync-core';
+import type { SyncEngineStatus } from '../../shared/sync-core';
 
 export function useOfflineSync() {
   const [status, setStatus] = useState<SyncEngineStatus>({
@@ -13,7 +13,7 @@ export function useOfflineSync() {
 
   useEffect(() => {
     const engine = getSyncEngine();
-    const unsubscribe = engine.subscribe((newStatus) => {
+    const unsubscribe = engine.subscribe((newStatus: SyncEngineStatus) => {
       setStatus(newStatus);
     });
 
