@@ -51,8 +51,7 @@ const SYSTEM_MODULES: NavItem[] = [
     name: 'Monitoreo Inteligente',
     path: '/admin/monitoreo-inteligente',
     icon: Activity,
-    roles: ['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR'],
-    badge: 'IA CU-23',
+    roles: ['ADMINISTRADOR', 'RECEPCIONISTA'],
     badgeType: 'native',
   },
 ];

@@ -12,4 +12,5 @@ public interface ControlAccesoUseCase {
     ValidacionAccesoPayload validarAccesoPorQr(com.apexfitness.gimnasio.domain.model.dto.ValidarAccesoQrCommand command);
     String generarQrPaseDigital(UUID inscripcionId);
     List<RegistroAcceso> listarRegistros(UUID clienteId, int limite);
+    List<RegistroAcceso> listarRegistrosPagina(int pagina, int limite);
 }

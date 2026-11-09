@@ -60,7 +60,7 @@ export default function App() {
             <Route
               path="/admin/monitoreo-inteligente"
               element={
-                <ProtectedRoute allowedRoles={['ADMINISTRADOR', 'RECEPCIONISTA', 'INSTRUCTOR']}>
+                <ProtectedRoute allowedRoles={['ADMINISTRADOR', 'RECEPCIONISTA']}>
                   <MonitoreoInteligentePage />
                 </ProtectedRoute>
               }

@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface BoletaInscripcionRepositoryPort {
     List<BoletaInscripcion> findAll(UUID clienteId, EstadoInscripcion estado);
+    List<BoletaInscripcion> findPage(int pagina, int limite);
     Optional<BoletaInscripcion> findById(UUID id);
     Optional<BoletaInscripcion> findByCodigoMatricula(String codigoMatricula);
     Optional<BoletaInscripcion> findInscripcionVigenteCliente(UUID clienteId, LocalDate fechaActual);

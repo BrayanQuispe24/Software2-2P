@@ -362,6 +362,7 @@ type Query {
 
   # Inscripciones
   inscripciones(clienteId: ID, estado: EstadoInscripcion): [BoletaInscripcion!]!
+  inscripcionesPagina(pagina: Int = 0, limite: Int = 500): [BoletaInscripcion!]!
   inscripcion(id: ID!): BoletaInscripcion
   inscripcionActivaCliente(clienteId: ID!): BoletaInscripcion
 
@@ -371,6 +372,7 @@ type Query {
 
   # Control de Acceso
   registrosAcceso(clienteId: ID, limite: Int = 50): [RegistroAcceso!]!
+  registrosAccesoPagina(pagina: Int = 0, limite: Int = 500): [RegistroAcceso!]!
   obtenerQrPaseDigital(inscripcionId: ID!): String!
 }
 

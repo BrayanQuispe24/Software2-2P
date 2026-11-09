@@ -20,6 +20,11 @@ public class ControlAccesoGraphQLController {
     private final ControlAccesoUseCase controlAccesoUseCase;
 
     @QueryMapping
+    public List<RegistroAcceso> registrosAccesoPagina(@Argument Integer pagina, @Argument Integer limite) {
+        return controlAccesoUseCase.listarRegistrosPagina(pagina != null ? pagina : 0, limite != null ? limite : 500);
+    }
+
+    @QueryMapping
     public List<RegistroAcceso> registrosAcceso(@Argument UUID clienteId, @Argument Integer limite) {
         return controlAccesoUseCase.listarRegistros(clienteId, limite != null ? limite : 50);
     }

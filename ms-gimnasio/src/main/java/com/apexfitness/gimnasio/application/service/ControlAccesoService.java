@@ -207,4 +207,13 @@ public class ControlAccesoService implements ControlAccesoUseCase {
     public List<RegistroAcceso> listarRegistros(UUID clienteId, int limite) {
         return registroAccesoRepository.findAll(clienteId, Math.min(limite, 100));
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RegistroAcceso> listarRegistrosPagina(int pagina, int limite) {
+        if (pagina < 0 || limite < 1 || limite > 500) {
+            throw new IllegalArgumentException("Página inválida: página >= 0 y límite entre 1 y 500");
+        }
+        return registroAccesoRepository.findPage(pagina, limite);
+    }
 }

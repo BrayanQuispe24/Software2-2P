@@ -163,6 +163,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       AGENTES_SERVICE_URL: http://ms-agentes:8085/api/v1
+      AGENTES_INTERNAL_TOKEN: ${AGENTES_INTERNAL_TOKEN:-apex-local-agentes-77fa62d3a2c74ce0beba4a113069f804}
     depends_on:
       - ms-auth
       - redis
@@ -262,11 +263,12 @@ services:
     environment:
       DATABASE_URL: postgresql://agentes_user:agentes_dev_password@db-agentes:5432/ms_agentes_db
       PORT: 8085
+      INTERNAL_API_TOKEN: ${AGENTES_INTERNAL_TOKEN:-apex-local-agentes-77fa62d3a2c74ce0beba4a113069f804}
       GYM_SERVICE_URL: http://ms-gimnasio:8082
       INVENTARIO_SERVICE_URL: http://ms-inventario:8084
       ENTRENAMIENTO_SERVICE_URL: http://ms-entrenamiento:8083
-      ML_SERVICE_URL: http://host.docker.internal:8000
-      N8N_WEBHOOK_URL: http://host.docker.internal:5678/webhook/agente-alerta
+      ML_SERVICE_URL: ${ML_SERVICE_URL:-http://host.docker.internal:8000}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://host.docker.internal:5678/webhook/agente-alerta}
     depends_on:
       db-agentes:
         condition: service_healthy

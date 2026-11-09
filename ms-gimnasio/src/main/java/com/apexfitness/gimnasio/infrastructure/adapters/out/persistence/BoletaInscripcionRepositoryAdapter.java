@@ -34,6 +34,13 @@ public class BoletaInscripcionRepositoryAdapter implements BoletaInscripcionRepo
     private final SpringDataFormularioSolicitudRepository formularioSolicitudRepository;
 
     @Override
+    public List<BoletaInscripcion> findPage(int pagina, int limite) {
+        return repository.findAll(org.springframework.data.domain.PageRequest.of(pagina, limite,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")))
+                .stream().map(PersistenceMapper::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
     public List<BoletaInscripcion> findAll(UUID clienteId, EstadoInscripcion estado) {
         return repository.findByFilter(clienteId, estado).stream()
                 .map(PersistenceMapper::toDomain)

@@ -34,10 +34,13 @@ class ReglaMonitoreoModel(Base):
     umbral_critico = Column(Float, nullable=False)
     umbral_cierre_histeresis = Column(Float, nullable=True)
     duracion_minima_seg = Column(Integer, default=0)
+    horario_inicio = Column(String(5), nullable=True)
+    horario_fin = Column(String(5), nullable=True)
+    anomalia_desde = Column(DateTime, nullable=True)
     cooldown_seg = Column(Integer, default=300)
     nivel_autonomia = Column(Integer, default=3)
     activa = Column(Boolean, default=True)
-    destinatarios_json = Column(Text, default="[\"admin@apexfitness.com\"]")
+    destinatarios_json = Column(Text, default="[]")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     @property
@@ -105,6 +108,7 @@ class AlertaModel(Base):
     evidencia_json = Column(Text, default="{}")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    ultima_notificacion_at = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, nullable=True)
 
 class AccionAgenteModel(Base):

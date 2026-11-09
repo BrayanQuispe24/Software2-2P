@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -16,10 +16,13 @@ class Settings(BaseSettings):
     # Planificador
     SCHEDULER_ENABLED: bool = True
     MONITOR_INTERVAL_SECONDS: int = 30
+    INTERNAL_API_TOKEN: str = ""
+    MAX_READING_AGE_SECONDS: int = 120
+    SOURCE_TIMEOUT_SECONDS: float = 5.0
+    RETENTION_INACTIVITY_DAYS: int = 14
+    MONITOR_TIMEZONE: str = "America/La_Paz"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
 

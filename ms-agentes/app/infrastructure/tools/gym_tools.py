@@ -1,14 +1,17 @@
 import logging
 import httpx
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
+from .gym_data import graphql, accesses, enrollments, utc
+from zoneinfo import ZoneInfo
+import math
 
 from ...config import settings
 from ...domain.entities import IndicadorNegocio
 
 logger = logging.getLogger("ms-agentes.tools")
 
-FAST_TIMEOUT = httpx.Timeout(connect=0.2, read=1.0, write=1.0, pool=1.0)
+FAST_TIMEOUT = httpx.Timeout(settings.SOURCE_TIMEOUT_SECONDS)
 
 class GymToolsAdapter:
     """
@@ -16,199 +19,155 @@ class GymToolsAdapter:
     Consulta mediante APIs/GraphQL oficiales sin acceso directo a las bases de datos ajenas.
     """
 
-    @classmethod
-    async def obtener_aforo_actual(cls, sede_id: str = "SEDE-CENTRAL") -> IndicadorNegocio:
-        """
-        Consulta ms-gimnasio para obtener ingresos, salidas, ocupación y aforo máximo.
-        """
-        query = """
-        query {
-            disciplinas(soloActivas: true) {
-                capacidadMaxima
-            }
-            registrosAcceso(limite: 100) {
-                tipoMovimiento
-                estadoAcceso
-                fechaHora
-            }
-        }
-        """
-        capacidad_total = 100
-        presentes = 0
+    @staticmethod
+    def no_disponible(nombre, unidad, sede_id, origen, motivo):
+        return IndicadorNegocio(nombre=nombre, valor_actual=0, unidad=unidad,
+            sede_id=sede_id, servicio_origen=origen, confiable=False,
+            metadata={"disponible": False, "error": str(motivo)})
 
+    @staticmethod
+    def validar_sede(sede_id):
+        if sede_id != "SEDE-CENTRAL":
+            raise ValueError("La fuente actual no permite filtrar otras sedes")
+
+    @classmethod
+    async def obtener_aforo_actual(cls, sede_id="SEDE-CENTRAL"):
+        nombre = "Ocupaci\u00f3n de Aforo"
         try:
-            async with httpx.AsyncClient(timeout=FAST_TIMEOUT) as client:
-                res = await client.post(
-                    f"{settings.GYM_SERVICE_URL}/graphql",
-                    json={"query": query},
-                    headers={"Content-Type": "application/json"}
-                )
-                if res.status_code == 200:
-                    data = res.json().get("data", {})
-                    disciplinas = data.get("disciplinas", [])
-                    if disciplinas:
-                        capacidad_total = sum(d.get("capacidadMaxima", 0) for d in disciplinas) or 100
-
-                    registros = data.get("registrosAcceso", [])
-                    entradas = sum(1 for r in registros if r.get("tipoMovimiento") == "ENTRADA" and r.get("estadoAcceso") == "PERMITIDO")
-                    salidas = sum(1 for r in registros if r.get("tipoMovimiento") == "SALIDA" and r.get("estadoAcceso") == "PERMITIDO")
-                    presentes = max(0, entradas - salidas)
-                    if presentes == 0 and registros:
-                        presentes = min(capacidad_total, len(registros))
-        except Exception as e:
-            logger.debug(f"ms-gimnasio no disponible o sin registros en vivo ({e}). Usando valor base controlado.")
-            # Valor nominal por defecto si el microservicio de gimnasio está frío
-            presentes = 45
-            capacidad_total = 100
-
-        porcentaje_ocupacion = round((presentes / capacidad_total) * 100, 1)
-
-        return IndicadorNegocio(
-            nombre="Ocupación de Aforo",
-            valor_actual=porcentaje_ocupacion,
-            valor_referencia=75.0, # Promedio esperado
-            unidad="%",
-            sede_id=sede_id,
-            servicio_origen="ms-gimnasio",
-            confiable=True,
-            metadata={
-                "presentes": presentes,
-                "capacidad_total": capacidad_total,
-                "sede_id": sede_id
-            }
-        )
+            cls.validar_sede(sede_id)
+            data = await graphql("{ disciplinas(soloActivas: true) { capacidadMaxima } }")
+            capacidad = sum(d["capacidadMaxima"] for d in data["disciplinas"])
+            if capacidad <= 0:
+                raise ValueError("Capacidad no configurada")
+            records = await accesses()
+            latest = {}
+            for row in sorted(records, key=lambda r: utc(r["fechaHora"]), reverse=True):
+                if row["estadoAcceso"] == "PERMITIDO":
+                    latest.setdefault(row["clienteId"], row)
+            presentes = sum(r["tipoMovimiento"] == "ENTRADA" for r in latest.values())
+            return IndicadorNegocio(nombre=nombre, valor_actual=round(presentes / capacidad * 100, 1),
+                unidad="%", sede_id=sede_id, servicio_origen="ms-gimnasio", confiable=True,
+                metadata={"presentes": presentes, "capacidad_total": capacidad,
+                    "criterio_capacidad": "Suma de capacidades de disciplinas activas", "disponible": True})
+        except Exception as exc:
+            return cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", exc)
 
     @classmethod
-    async def obtener_asistencias(cls, fecha_inicio: str, fecha_fin: str, sede_id: str = "SEDE-CENTRAL") -> IndicadorNegocio:
-        """
-        Consulta la tendencia de afluencia horaria en ms-gimnasio.
-        """
-        # Comparación contra referencia histórica
-        afluencia_actual = 85
-        afluencia_referencia = 45 # Habitual lunes 18:00
-        variacion_pct = round(((afluencia_actual - afluencia_referencia) / afluencia_referencia) * 100, 1)
-
-        return IndicadorNegocio(
-            nombre="Afluencia Horaria",
-            valor_actual=afluencia_actual,
-            valor_referencia=afluencia_referencia,
-            unidad="personas",
-            sede_id=sede_id,
-            servicio_origen="ms-gimnasio",
-            confiable=True,
-            metadata={
-                "variacion_pct": variacion_pct,
-                "franja_horaria": "18:00 - 19:00",
-                "fecha_inicio": fecha_inicio,
-                "fecha_fin": fecha_fin
-            }
-        )
-
-    @classmethod
-    async def obtener_resumen_inscripciones(cls, periodo: str = "semanal", sede_id: str = "SEDE-CENTRAL") -> IndicadorNegocio:
-        """
-        Consulta ms-gimnasio para obtener nuevas matrículas, altas y variaciones comerciales.
-        """
-        # Referencia: 40 matrículas/semana -> Actual: 28 (-30% de variación)
-        matriculas_actual = 28
-        matriculas_referencia = 40
-        variacion_pct = round(((matriculas_actual - matriculas_referencia) / matriculas_referencia) * 100, 1)
-
-        return IndicadorNegocio(
-            nombre="Variación de Nuevas Matrículas",
-            valor_actual=variacion_pct, # ej. -30.0%
-            valor_referencia=0.0,
-            unidad="%",
-            sede_id=sede_id,
-            servicio_origen="ms-gimnasio",
-            confiable=True,
-            metadata={
-                "matriculas_periodo_actual": matriculas_actual,
-                "matriculas_periodo_anterior": matriculas_referencia,
-                "periodo": periodo
-            }
-        )
-
-    @classmethod
-    async def obtener_membresias_por_vencer(cls, dias: int = 15, sede_id: str = "SEDE-CENTRAL") -> IndicadorNegocio:
-        """
-        Consulta en ms-gimnasio las membresías activas próximas a caducar.
-        """
-        query = """
-        query {
-            inscripciones(estado: ACTIVA) {
-                id
-                fechaFin
-                estado
-            }
-        }
-        """
-        total_por_vencer = 12
+    async def obtener_asistencias(cls, fecha_inicio, fecha_fin, sede_id="SEDE-CENTRAL"):
         try:
-            async with httpx.AsyncClient(timeout=FAST_TIMEOUT) as client:
-                res = await client.post(
-                    f"{settings.GYM_SERVICE_URL}/graphql",
-                    json={"query": query},
-                    headers={"Content-Type": "application/json"}
-                )
-                if res.status_code == 200:
-                    data = res.json().get("data", {})
-                    inscripciones = data.get("inscripciones", [])
-                    total_por_vencer = len(inscripciones)
-        except Exception:
-            pass
+            cls.validar_sede(sede_id)
+            inicio, fin = date.fromisoformat(fecha_inicio), date.fromisoformat(fecha_fin)
+            if fin < inicio:
+                raise ValueError("El fin debe ser posterior al inicio")
+            records = await accesses()
+            total = sum(r["estadoAcceso"] == "PERMITIDO" and r["tipoMovimiento"] == "ENTRADA"
+                and inicio <= utc(r["fechaHora"]).astimezone(ZoneInfo(settings.MONITOR_TIMEZONE)).date() <= fin for r in records)
+            return IndicadorNegocio(nombre="Afluencia Horaria", valor_actual=total, unidad="entradas",
+                sede_id=sede_id, servicio_origen="ms-gimnasio", confiable=True,
+                metadata={"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin, "disponible": True})
+        except Exception as exc:
+            return cls.no_disponible("Afluencia Horaria", "entradas", sede_id, "ms-gimnasio", exc)
 
-        return IndicadorNegocio(
-            nombre="Membresías por Vencer",
-            valor_actual=float(total_por_vencer),
-            valor_referencia=5.0,
-            unidad="membresías",
-            sede_id=sede_id,
-            servicio_origen="ms-gimnasio",
-            confiable=True,
-            metadata={"ventana_dias": dias}
-        )
+    @classmethod
+    async def obtener_resumen_inscripciones(cls, periodo="semanal", sede_id="SEDE-CENTRAL"):
+        nombre = "Variaci\u00f3n de Nuevas Matr\u00edculas"
+        try:
+            cls.validar_sede(sede_id)
+            if periodo not in {"semanal", "mensual"}:
+                raise ValueError("Periodo debe ser semanal o mensual")
+            dias = 7 if periodo == "semanal" else 30
+            fin = datetime.now(timezone.utc)
+            inicio, previo = fin - timedelta(days=dias), fin - timedelta(days=dias*2)
+            rows = await enrollments()
+            if any(not row.get("createdAt") for row in rows):
+                raise ValueError("Falta la fecha real de registro de una inscripcion")
+            dates = [utc(row["createdAt"]) for row in rows if row["estado"] != "CANCELADA"]
+            actual = sum(inicio <= d <= fin for d in dates)
+            anterior = sum(previo <= d < inicio for d in dates)
+            if not anterior:
+                result = cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", "Sin base de comparacion en el periodo anterior")
+                result.metadata.update(matriculas_periodo_actual=actual, matriculas_periodo_anterior=anterior)
+                return result
+            return IndicadorNegocio(nombre=nombre, valor_actual=round((actual-anterior)/anterior*100,1),
+                valor_referencia=0, unidad="%", sede_id=sede_id, servicio_origen="ms-gimnasio", confiable=True,
+                metadata={"matriculas_periodo_actual": actual, "matriculas_periodo_anterior": anterior,
+                    "periodo": periodo, "inicio": inicio.isoformat(), "fin": fin.isoformat(), "disponible": True})
+        except Exception as exc:
+            return cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", exc)
+
+    @classmethod
+    async def obtener_membresias_por_vencer(cls, dias=15, sede_id="SEDE-CENTRAL"):
+        nombre = "Membres\u00edas por Vencer"
+        try:
+            cls.validar_sede(sede_id)
+            if not isinstance(dias, int) or not 1 <= dias <= 365:
+                raise ValueError("Ventana de dias invalida")
+            hoy = datetime.now(ZoneInfo(settings.MONITOR_TIMEZONE)).date()
+            limite = hoy + timedelta(days=dias)
+            rows = await enrollments()
+            total = sum(r["estado"] == "ACTIVA" and hoy <= date.fromisoformat(r["fechaFin"]) <= limite for r in rows)
+            return IndicadorNegocio(nombre=nombre, valor_actual=total, unidad="membresias", sede_id=sede_id,
+                servicio_origen="ms-gimnasio", confiable=True, metadata={"ventana_dias": dias, "disponible": True})
+        except Exception as exc:
+            return cls.no_disponible(nombre, "membresias", sede_id, "ms-gimnasio", exc)
 
     @classmethod
     async def obtener_equipos_fuera_servicio(cls, sede_id: str = "SEDE-CENTRAL") -> IndicadorNegocio:
         """
         Consulta ms-inventario (GraphQL) para conocer equipos operativos y en mantenimiento.
-        Ejemplo del caso: 3 de 5 caminadoras fuera de servicio (40% de disponibilidad).
         """
         query = """
-        query {
-            equipos {
-                id
-                nombre
-                estado
-                cantidad
+        query Equipos($page: Int!) {
+            equipos(first: 100, page: $page) {
+                data { id nombre estado cantidad tipoEquipo { nombre } }
+                paginatorInfo { hasMorePages }
             }
         }
         """
-        total_caminadoras = 5
-        operativas = 2
-        fuera_servicio = 3
+        total_caminadoras = 0
+        operativas = 0
+        fuera_servicio = 0
+        confiable = False
+        error = None
 
         try:
+            cls.validar_sede(sede_id)
             async with httpx.AsyncClient(timeout=FAST_TIMEOUT) as client:
-                res = await client.post(
-                    f"{settings.INVENTARIO_SERVICE_URL}/graphql",
-                    json={"query": query},
-                    headers={"Content-Type": "application/json"}
-                )
-                if res.status_code == 200:
-                    data = res.json().get("data", {})
-                    equipos = data.get("equipos", [])
-                    if equipos:
-                        caminadoras = [e for e in equipos if "caminadora" in e.get("nombre", "").lower() or "treadmill" in e.get("nombre", "").lower()]
-                        if caminadoras:
-                            total_caminadoras = sum(e.get("cantidad", 1) for e in caminadoras)
-                            fuera_servicio = sum(e.get("cantidad", 1) for e in caminadoras if e.get("estado") in ["EN_MANTENIMIENTO", "DE_BAJA", "EN_REVISION"])
-                            operativas = max(0, total_caminadoras - fuera_servicio)
-        except Exception:
-            pass
+                page = 1
+                equipos = []
+                while True:
+                    res = await client.post(
+                        f"{settings.INVENTARIO_SERVICE_URL}/graphql",
+                        json={"query": query, "variables": {"page": page}},
+                    )
+                    res.raise_for_status()
+                    body = res.json()
+                    if body.get("errors"):
+                        raise ValueError("Inventario devolvió errores GraphQL")
+                    result = body["data"]["equipos"]
+                    equipos.extend(result["data"])
+                    if not result["paginatorInfo"]["hasMorePages"]:
+                        break
+                    page += 1
+                for equipo in equipos:
+                    nombre = equipo["nombre"].lower()
+                    cantidad = equipo["cantidad"]
+                    if isinstance(cantidad, bool) or not isinstance(cantidad, int) or cantidad < 0:
+                        raise ValueError("Cantidad de equipos inválida")
+                    estado = equipo["estado"]
+                    if estado not in {"OPERATIVO", "EN_MANTENIMIENTO", "DE_BAJA", "EN_REVISION"}:
+                        raise ValueError("Estado de equipo inválido")
+                    total_caminadoras += cantidad
+                    if estado != "OPERATIVO":
+                        fuera_servicio += cantidad
+                operativas = total_caminadoras - fuera_servicio
+                confiable = total_caminadoras > 0
+        except Exception as exc:
+            logger.warning("No se pudo obtener la disponibilidad de equipos: %s", exc)
+            total_caminadoras = operativas = fuera_servicio = 0
+            error = "Disponibilidad no disponible; no se evaluarán alertas con esta lectura"
 
-        disponibilidad_pct = round((operativas / total_caminadoras) * 100, 1) if total_caminadoras > 0 else 100.0
+        disponibilidad_pct = round((operativas / total_caminadoras) * 100, 1) if total_caminadoras > 0 else 0.0
 
         return IndicadorNegocio(
             nombre="Disponibilidad de Equipos Críticos",
@@ -217,12 +176,13 @@ class GymToolsAdapter:
             unidad="%",
             sede_id=sede_id,
             servicio_origen="ms-inventario",
-            confiable=True,
+            confiable=confiable,
             metadata={
-                "tipo_equipo": "Caminadoras / Cardio",
+                "tipo_equipo": "Todos los equipos registrados",
                 "total_equipos": total_caminadoras,
                 "operativas": operativas,
-                "fuera_servicio": fuera_servicio
+                "fuera_servicio": fuera_servicio,
+                "error": error,
             }
         )
 
@@ -231,44 +191,65 @@ class GymToolsAdapter:
         """
         Consulta las predicciones agregadas de abandono (Random Forest) en ms-machine-learning.
         """
-        # Proporción de clientes con score de abandono > 0.70
-        proporcion_riesgo_alto = 28.5 # 28.5% de clientes en alto riesgo
-        referencia_historica = 12.0
-
         try:
             async with httpx.AsyncClient(timeout=FAST_TIMEOUT) as client:
-                res = await client.get(f"{settings.ML_SERVICE_URL}/api/v1/ml/churn/summary?sede_id={sede_id}")
-                if res.status_code == 200:
-                    data = res.json()
-                    proporcion_riesgo_alto = data.get("proporcion_riesgo_alto", proporcion_riesgo_alto)
-                    referencia_historica = data.get("referencia_historica", referencia_historica)
+                res = await client.get(f"{settings.ML_SERVICE_URL}/api/v1/ml/churn/summary", params={"sede_id": sede_id})
+                res.raise_for_status()
+                data = res.json()
+                valor = float(data["proporcion_riesgo_alto"])
+                referencia = data.get("referencia_historica")
+                referencia = float(referencia) if referencia is not None else None
+                if not math.isfinite(valor) or not 0 <= valor <= 100:
+                    raise ValueError("Porcentaje de riesgo invalido")
+                if referencia is not None and (not math.isfinite(referencia) or not 0 <= referencia <= 100):
+                    raise ValueError("Referencia historica invalida")
+                return IndicadorNegocio(nombre="Proporci\u00f3n Clientes Alto Riesgo Abandono",
+                    valor_actual=valor, valor_referencia=referencia, unidad="%",
+                    sede_id=sede_id, servicio_origen="ms-machine-learning", confiable=True,
+                    metadata={"disponible": True, "metodo": "MODELO_ML", "es_prediccion_ml": True})
         except Exception:
-            pass
+            return await cls.obtener_riesgo_inactividad(sede_id)
 
-        return IndicadorNegocio(
-            nombre="Proporción Clientes Alto Riesgo Abandono",
-            valor_actual=proporcion_riesgo_alto,
-            valor_referencia=referencia_historica,
-            unidad="%",
-            sede_id=sede_id,
-            servicio_origen="ms-machine-learning",
-            confiable=True,
-            metadata={
-                "modelo": "RandomForestClassifier",
-                "clientes_evaluados": 140,
-                "umbral_score_riesgo": 0.70
-            }
-        )
+    @classmethod
+    async def obtener_riesgo_inactividad(cls, sede_id="SEDE-CENTRAL"):
+        nombre = "Proporci\u00f3n Clientes Alto Riesgo Abandono"
+        try:
+            cls.validar_sede(sede_id)
+            hoy = datetime.now(ZoneInfo(settings.MONITOR_TIMEZONE)).date()
+            corte = hoy - timedelta(days=settings.RETENTION_INACTIVITY_DAYS)
+            members = {}
+            for row in await enrollments():
+                if row["estado"] == "ACTIVA" and date.fromisoformat(row["fechaInicio"]) <= hoy <= date.fromisoformat(row["fechaFin"]):
+                    members.setdefault(row["clienteId"], date.fromisoformat(row["fechaInicio"]))
+                    members[row["clienteId"]] = min(members[row["clienteId"]], date.fromisoformat(row["fechaInicio"]))
+            if not members:
+                raise ValueError("No hay membresias activas para evaluar retencion")
+            latest = {}
+            for row in await accesses():
+                if row["estadoAcceso"] == "PERMITIDO" and row["tipoMovimiento"] == "ENTRADA":
+                    day = utc(row["fechaHora"]).astimezone(ZoneInfo(settings.MONITOR_TIMEZONE)).date()
+                    latest[row["clienteId"]] = max(day, latest.get(row["clienteId"], day))
+            riesgo = sum(latest.get(cliente, inicio) <= corte for cliente, inicio in members.items())
+            return IndicadorNegocio(nombre=nombre, valor_actual=round(riesgo/len(members)*100,1),
+                unidad="%", sede_id=sede_id, servicio_origen="ms-gimnasio", confiable=True,
+                metadata={"metodo": "REGLA_INACTIVIDAD", "es_prediccion_ml": False,
+                    "dias_sin_asistir": settings.RETENTION_INACTIVITY_DAYS,
+                    "clientes_evaluados": len(members), "clientes_inactivos": riesgo, "disponible": True})
+        except Exception as exc:
+            return cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", exc)
 
     @classmethod
     async def solicitar_notificacion(cls, alerta_id: str, destinatarios: List[str], payload: Dict[str, Any]) -> bool:
         """
         Despacha un webhook autorizado hacia n8n para la automatización de comunicaciones (Nivel 3).
         """
+        if not destinatarios or not settings.N8N_WEBHOOK_URL:
+            return False
         try:
             async with httpx.AsyncClient(timeout=FAST_TIMEOUT) as client:
                 res = await client.post(
                     settings.N8N_WEBHOOK_URL,
+                    headers={"Idempotency-Key": payload.get("accion_id", alerta_id)},
                     json={
                         "alerta_id": alerta_id,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -280,4 +261,4 @@ class GymToolsAdapter:
                 return res.status_code in [200, 201, 202]
         except Exception as e:
             logger.info(f"Webhook n8n no alcanzable ({e}), notificación registrada en memoria operativa.")
-            return True
+            return False

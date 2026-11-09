@@ -28,11 +28,12 @@ services:
     environment:
       DATABASE_URL: postgresql://agentes_user:agentes_dev_password@db-agentes:5432/ms_agentes_db
       PORT: 8085
+      INTERNAL_API_TOKEN: ${AGENTES_INTERNAL_TOKEN:?Configura AGENTES_INTERNAL_TOKEN para el gateway}
       GYM_SERVICE_URL: http://host.docker.internal:8082
       INVENTARIO_SERVICE_URL: http://host.docker.internal:8084
       ENTRENAMIENTO_SERVICE_URL: http://host.docker.internal:8083
-      ML_SERVICE_URL: http://host.docker.internal:8000
-      N8N_WEBHOOK_URL: http://host.docker.internal:5678/webhook/agente-alerta
+      ML_SERVICE_URL: ${ML_SERVICE_URL:-http://host.docker.internal:8000}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://host.docker.internal:5678/webhook/agente-alerta}
     depends_on:
       db-agentes:
         condition: service_healthy

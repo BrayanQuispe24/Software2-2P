@@ -24,6 +24,27 @@ from app.infrastructure.models import (
     HistorialDecisionModel,
 )
 
+async def run_test_cycle(db, tipo_ejecucion, override_indicadores=None):
+    from contextlib import ExitStack
+    from unittest.mock import patch, AsyncMock
+    override = override_indicadores or {}
+    sources = [
+        ("obtener_aforo_actual", "aforo_pct", "Ocupaci\u00f3n de Aforo", "ms-gimnasio"),
+        ("obtener_resumen_inscripciones", "matriculas_var_pct", "Variaci\u00f3n de Nuevas Matr\u00edculas", "ms-gimnasio"),
+        ("obtener_resumen_riesgo_abandono", "churn_alto_riesgo_pct", "Proporci\u00f3n Clientes Alto Riesgo Abandono", "ms-machine-learning"),
+        ("obtener_equipos_fuera_servicio", "disponibilidad_equipos_pct", "Disponibilidad de Equipos Cr\u00edticos", "ms-inventario"),
+    ]
+    with ExitStack() as stack:
+        for method, key, name, origin in sources:
+            indicator = IndicadorNegocio(nombre=name, valor_actual=override.get(key, 0),
+                unidad="%", sede_id="SEDE-CENTRAL", servicio_origen=origin,
+                confiable=key in override)
+            stack.enter_context(patch(f"app.infrastructure.tools.gym_tools.GymToolsAdapter.{method}",
+                new=AsyncMock(return_value=indicator)))
+        stack.enter_context(patch("app.infrastructure.tools.gym_tools.GymToolsAdapter.solicitar_notificacion",
+            new=AsyncMock(return_value=True)))
+        return await AgentOrchestratorService.ejecutar_ciclo_completo(db=db, tipo_ejecucion=tipo_ejecucion)
+
 @pytest.fixture
 def test_db():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
@@ -43,9 +64,9 @@ def test_aforo_progression_escalation_and_hysteresis(test_db):
     """
     async def run():
         # Paso 1: Ocupación al 92% (Umbral preventivo superado)
-        res1 = await AgentOrchestratorService.ejecutar_ciclo_completo(
+        res1 = await run_test_cycle(
             db=test_db,
-            tipo_ejecucion=TipoEjecucion.SIMULACION,
+            tipo_ejecucion=TipoEjecucion.MANUAL,
             override_indicadores={"aforo_pct": 92.0}
         )
         assert res1["alertas_generadas"] >= 1
@@ -58,9 +79,9 @@ def test_aforo_progression_escalation_and_hysteresis(test_db):
         assert alerta_original.estado in [EstadoAlerta.DETECTADA.value, EstadoAlerta.NOTIFICADA.value]
 
         # Paso 2: Cinco minutos después sube a 100% de aforo
-        res2 = await AgentOrchestratorService.ejecutar_ciclo_completo(
+        res2 = await run_test_cycle(
             db=test_db,
-            tipo_ejecucion=TipoEjecucion.SIMULACION,
+            tipo_ejecucion=TipoEjecucion.MANUAL,
             override_indicadores={"aforo_pct": 100.0}
         )
         alertas_aforo_despues = test_db.query(AlertaModel).filter_by(agente_tipo=TipoAgente.AFORO.value).all()
@@ -74,9 +95,9 @@ def test_aforo_progression_escalation_and_hysteresis(test_db):
         assert alerta_escalada.contador_ocurrencias >= 2
 
         # Paso 3: Baja a 82% (por debajo del umbral de histéresis del 85%)
-        res3 = await AgentOrchestratorService.ejecutar_ciclo_completo(
+        res3 = await run_test_cycle(
             db=test_db,
-            tipo_ejecucion=TipoEjecucion.SIMULACION,
+            tipo_ejecucion=TipoEjecucion.MANUAL,
             override_indicadores={"aforo_pct": 82.0}
         )
         alerta_final = test_db.query(AlertaModel).filter_by(id=alerta_original.id).first()
@@ -94,9 +115,9 @@ def test_commercial_and_ml_retention_correlation_scenario_15(test_db):
     - El agente genera alertas fundamentadas con evidencia y recomendación sin afirmar falsa causalidad.
     """
     async def run():
-        res = await AgentOrchestratorService.ejecutar_ciclo_completo(
+        res = await run_test_cycle(
             db=test_db,
-            tipo_ejecucion=TipoEjecucion.SIMULACION,
+            tipo_ejecucion=TipoEjecucion.MANUAL,
             override_indicadores={
                 "matriculas_var_pct": -25.0,
                 "churn_alto_riesgo_pct": 28.5
@@ -130,9 +151,9 @@ def test_operativo_equipment_availability(test_db):
     Dispara alerta Crítica al caer por debajo del umbral del 45%.
     """
     async def run():
-        res = await AgentOrchestratorService.ejecutar_ciclo_completo(
+        res = await run_test_cycle(
             db=test_db,
-            tipo_ejecucion=TipoEjecucion.SIMULACION,
+            tipo_ejecucion=TipoEjecucion.MANUAL,
             override_indicadores={"disponibilidad_equipos_pct": 40.0}
         )
 
@@ -190,9 +211,9 @@ def test_cycle_latency_under_10_seconds(test_db):
     """
     async def run():
         start = time.time()
-        res = await AgentOrchestratorService.ejecutar_ciclo_completo(
+        res = await run_test_cycle(
             db=test_db,
-            tipo_ejecucion=TipoEjecucion.SIMULACION
+            tipo_ejecucion=TipoEjecucion.MANUAL
         )
         elapsed = time.time() - start
         assert elapsed < 10.0, f"La latencia del ciclo ({elapsed}s) superó los 10 segundos requeridos"

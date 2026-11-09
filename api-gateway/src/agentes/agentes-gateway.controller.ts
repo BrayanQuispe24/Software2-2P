@@ -27,14 +27,11 @@ export class AgentesGatewayController {
   private validateAuth(req: Request, requireAdmin = false) {
     const user = req.session?.user;
     if (!user) {
-      if (process.env.NODE_ENV !== 'production') {
-        return { roles: ['ADMINISTRADOR'], email: 'dev-admin@apexfitness.com', name: 'Dev Admin' };
-      }
       throw new UnauthorizedException('No hay sesión activa para consultar el Centro de Monitoreo Inteligente.');
     }
 
     const roles = user.roles || [];
-    const isAuthorized = roles.includes('ADMINISTRADOR') || roles.includes('RECEPCIONISTA') || roles.includes('INSTRUCTOR');
+    const isAuthorized = roles.includes('ADMINISTRADOR') || roles.includes('RECEPCIONISTA');
 
     if (!isAuthorized) {
       throw new ForbiddenException('No cuentas con permisos para acceder al sistema de Agentes Inteligentes.');
@@ -47,10 +44,58 @@ export class AgentesGatewayController {
     return user;
   }
 
-  @Get('health')
-  async healthCheck(@Res() res: Response) {
+  private internalHeaders(req: Request): Record<string, string> {
+    const user = this.validateAuth(req);
+    return {
+      'Content-Type': 'application/json',
+      'X-Internal-Token': this.config.getOrThrow<string>('AGENTES_INTERNAL_TOKEN'),
+      'X-Actor-Role': user.roles?.includes('ADMINISTRADOR') ? 'ADMINISTRADOR' : 'LECTOR',
+      'X-Actor-Id': user.email || user.name || 'usuario-autenticado',
+    };
+  }
+
+  @Put('agentes/:tipo')
+  async configureAgent(@Req() req: Request, @Res() res: Response, @Param('tipo') tipo: string, @Body() body: Record<string, unknown>) {
+    this.validateAuth(req, true);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/health/ready`);
+      const response = await fetch(`${this.agentesServiceUrl}/agentes/${encodeURIComponent(tipo)}`, {
+        method: 'PUT', headers: this.internalHeaders(req), body: JSON.stringify(body),
+      });
+      return res.status(response.status).json(await response.json());
+    } catch {
+      return res.status(HttpStatus.BAD_GATEWAY).json({ message: 'No se pudo actualizar la configuración del agente.' });
+    }
+  }
+
+  @Get('acciones')
+  async listActions(@Req() req: Request, @Res() res: Response) {
+    this.validateAuth(req);
+    try {
+      const response = await fetch(`${this.agentesServiceUrl}/acciones`, { headers: this.internalHeaders(req) });
+      return res.status(response.status).json(await response.json());
+    } catch {
+      return res.status(HttpStatus.BAD_GATEWAY).json({ message: 'No se pudieron consultar las acciones.' });
+    }
+  }
+
+  @Post('acciones/:id/ejecutar')
+  async executeApprovedAction(@Req() req: Request, @Res() res: Response, @Param('id') id: string) {
+    this.validateAuth(req, true);
+    try {
+      const response = await fetch(`${this.agentesServiceUrl}/acciones/${encodeURIComponent(id)}/ejecutar`, {
+        method: 'POST', headers: this.internalHeaders(req),
+      });
+      return res.status(response.status).json(await response.json());
+    } catch {
+      return res.status(HttpStatus.BAD_GATEWAY).json({ message: 'No se pudo confirmar el despacho de la propuesta.' });
+    }
+  }
+
+  @Get('health')
+  async healthCheck(@Req() req: Request, @Res() res: Response) {
+    this.validateAuth(req);
+    try {
+      const response = await fetch(`${this.agentesServiceUrl}/health/ready`, { headers: this.internalHeaders(req) });
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch {
@@ -65,7 +110,7 @@ export class AgentesGatewayController {
   async getSummary(@Req() req: Request, @Res() res: Response) {
     this.validateAuth(req);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/dashboard/summary`);
+      const response = await fetch(`${this.agentesServiceUrl}/dashboard/summary`, { headers: this.internalHeaders(req) });
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch (error: any) {
@@ -81,7 +126,7 @@ export class AgentesGatewayController {
     this.validateAuth(req);
     try {
       const qs = new URLSearchParams(query).toString();
-      const response = await fetch(`${this.agentesServiceUrl}/alertas${qs ? `?${qs}` : ''}`);
+      const response = await fetch(`${this.agentesServiceUrl}/alertas${qs ? `?${qs}` : ''}`, { headers: this.internalHeaders(req) });
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch (error: any) {
@@ -96,7 +141,7 @@ export class AgentesGatewayController {
   async getAlertaDetail(@Req() req: Request, @Res() res: Response, @Param('id') id: string) {
     this.validateAuth(req);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/alertas/${id}`);
+      const response = await fetch(`${this.agentesServiceUrl}/alertas/${encodeURIComponent(id)}`, { headers: this.internalHeaders(req) });
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch (error: any) {
@@ -116,12 +161,12 @@ export class AgentesGatewayController {
   ) {
     const user = this.validateAuth(req);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/alertas/${id}/estado`, {
+      const response = await fetch(`${this.agentesServiceUrl}/alertas/${encodeURIComponent(id)}/estado`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.internalHeaders(req),
         body: JSON.stringify({
           ...body,
-          responsable: body.responsable || user.name || user.email,
+          responsable: user.email || user.name,
         }),
       });
       const data = await response.json();
@@ -143,9 +188,9 @@ export class AgentesGatewayController {
   ) {
     this.validateAuth(req);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/alertas/${id}/explicacion-ia`, {
+      const response = await fetch(`${this.agentesServiceUrl}/alertas/${encodeURIComponent(id)}/explicacion-ia`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.internalHeaders(req),
         body: JSON.stringify(body),
       });
       const data = await response.json();
@@ -164,7 +209,7 @@ export class AgentesGatewayController {
     try {
       const response = await fetch(`${this.agentesServiceUrl}/evaluaciones/ejecutar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.internalHeaders(req),
         body: JSON.stringify(body),
       });
       const data = await response.json();
@@ -177,30 +222,11 @@ export class AgentesGatewayController {
     }
   }
 
-  @Post('simulador/aforo')
-  async simulateAforo(@Req() req: Request, @Res() res: Response, @Body() body: Record<string, any>) {
-    this.validateAuth(req);
-    try {
-      const response = await fetch(`${this.agentesServiceUrl}/simulador/aforo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await response.json();
-      return res.status(response.status).json(data);
-    } catch (error: any) {
-      return res.status(HttpStatus.BAD_GATEWAY).json({
-        error: 'agentes_service_error',
-        message: `Error en simulador de aforo: ${error.message}`,
-      });
-    }
-  }
-
   @Get('reglas')
   async listReglas(@Req() req: Request, @Res() res: Response) {
     this.validateAuth(req);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/reglas`);
+      const response = await fetch(`${this.agentesServiceUrl}/reglas`, { headers: this.internalHeaders(req) });
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch (error: any) {
@@ -220,9 +246,9 @@ export class AgentesGatewayController {
   ) {
     this.validateAuth(req, true); // Requiere Administrador
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/reglas/${id}`, {
+      const response = await fetch(`${this.agentesServiceUrl}/reglas/${encodeURIComponent(id)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.internalHeaders(req),
         body: JSON.stringify(body),
       });
       const data = await response.json();
@@ -244,13 +270,13 @@ export class AgentesGatewayController {
   ) {
     const user = this.validateAuth(req, true); // Requiere Administrador explícito (Nivel 4)
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/acciones/${id}/autorizar`, {
+      const response = await fetch(`${this.agentesServiceUrl}/acciones/${encodeURIComponent(id)}/autorizar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.internalHeaders(req),
         body: JSON.stringify({
           ...body,
           accion_id: id,
-          aprobado_por: user.email || user.name || 'admin@apexfitness.com',
+          aprobado_por: user.email || user.name,
         }),
       });
       const data = await response.json();
@@ -269,7 +295,7 @@ export class AgentesGatewayController {
     try {
       const response = await fetch(`${this.agentesServiceUrl}/tools/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.internalHeaders(req),
         body: JSON.stringify(body),
       });
       const data = await response.json();
@@ -286,7 +312,7 @@ export class AgentesGatewayController {
   async getHistorial(@Req() req: Request, @Res() res: Response, @Query('limit') limit = '50') {
     this.validateAuth(req);
     try {
-      const response = await fetch(`${this.agentesServiceUrl}/historial?limit=${limit}`);
+      const response = await fetch(`${this.agentesServiceUrl}/historial?limit=${encodeURIComponent(limit)}`, { headers: this.internalHeaders(req) });
       const data = await response.json();
       return res.status(response.status).json(data);
     } catch (error: any) {

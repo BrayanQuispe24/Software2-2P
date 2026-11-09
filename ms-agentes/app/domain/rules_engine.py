@@ -30,14 +30,14 @@ class RulesEngine:
         Determina si un indicador supera umbrales preventivos o críticos.
         Retorna (Anomalia, condicion_activadora) o (None, None).
         """
-        if not regla.activa:
+        if not regla.activa or not indicador.confiable:
             return None, None
 
         valor = indicador.valor_actual
         ref = indicador.valor_referencia
 
         # Caso 1: Reglas de Umbral Máximo Superior (ej. Aforo %: 90% preventivo, 100% crítico)
-        if regla.agente_tipo in [TipoAgente.AFORO, TipoAgente.RETENCION]:
+        if regla.agente_tipo in [TipoAgente.AFORO, TipoAgente.RETENCION, TipoAgente.SEGUIMIENTO]:
             if valor >= regla.umbral_critico:
                 return (
                     Anomalia(
@@ -127,6 +127,24 @@ class RulesEngine:
         accion_tomada puede ser: 'CREADA', 'ESCALADA', 'COOLDOWN_IGNORADA', 'RESUELTA_POR_HISTERESIS', 'SIN_CAMBIOS'
         """
         now = datetime.now(timezone.utc)
+        if not indicador.confiable:
+            return None, "SIN_CAMBIOS", None
+
+        if alerta_existente and anomalia:
+            alerta_existente.titulo = RulesEngine.generar_titulo(regla, anomalia)
+            alerta_existente.condicion_activadora = f"{indicador.nombre} = {anomalia.valor_observado:g}{indicador.unidad}"
+            alerta_existente.evidencia_json = {
+                "indicador": indicador.nombre,
+                "valor_observado": anomalia.valor_observado,
+                "valor_referencia": anomalia.valor_referencia,
+                "unidad": indicador.unidad,
+                "umbrales": {"preventivo": regla.umbral_preventivo, "critico": regla.umbral_critico, "cierre": regla.umbral_cierre_histeresis},
+                "metadata": indicador.metadata,
+            }
+            alerta_existente.valor_referencia = anomalia.valor_referencia
+            alerta_existente.explicacion = anomalia.descripcion
+            alerta_existente.origen_explicacion = "DETERMINISTICO"
+            alerta_existente.modelo_ia_browser = None
 
         # 1. Caso de Resolución por Histéresis:
         # Si había una alerta abierta pero ahora el indicador está por debajo del umbral de cierre
@@ -168,7 +186,7 @@ class RulesEngine:
             if sev_nueva > sev_actual:
                 alerta_existente.severidad = anomalia.severidad
                 alerta_existente.valor_observado = anomalia.valor_observado
-                alerta_existente.condicion_activadora = f"{regla.indicador_clave} escaló a {anomalia.valor_observado}{indicador.unidad} (Severidad {anomalia.severidad})"
+                alerta_existente.condicion_activadora = f"{indicador.nombre} = {anomalia.valor_observado:g}{indicador.unidad} (Severidad {anomalia.severidad.value})"
                 alerta_existente.contador_ocurrencias += 1
                 alerta_existente.updated_at = now
                 alerta_existente.estado = EstadoAlerta.ESCALADA
@@ -182,7 +200,8 @@ class RulesEngine:
                     "valor_observado": anomalia.valor_observado,
                     "valor_referencia": anomalia.valor_referencia,
                     "unidad": indicador.unidad,
-                    "metadata": indicador.metadata,
+                    "umbrales": {"preventivo": regla.umbral_preventivo, "critico": regla.umbral_critico, "cierre": regla.umbral_cierre_histeresis},
+                "metadata": indicador.metadata,
                     "escalado": True
                 }
 
@@ -190,7 +209,8 @@ class RulesEngine:
                 return alerta_existente, "ESCALADA", accion
 
             # Si la severidad es igual o menor, entra en COOLDOWN para evitar spam repetido
-            delta_seg = (now - alerta_existente.updated_at.replace(tzinfo=timezone.utc if alerta_existente.updated_at.tzinfo is None else alerta_existente.updated_at.tzinfo)).total_seconds()
+            ultima_accion = alerta_existente.ultima_notificacion_at or alerta_existente.created_at
+            delta_seg = (now - ultima_accion.replace(tzinfo=ultima_accion.tzinfo or timezone.utc)).total_seconds()
             if delta_seg < regla.cooldown_seg:
                 alerta_existente.contador_ocurrencias += 1
                 alerta_existente.valor_observado = anomalia.valor_observado
@@ -201,7 +221,8 @@ class RulesEngine:
             alerta_existente.contador_ocurrencias += 1
             alerta_existente.valor_observado = anomalia.valor_observado
             alerta_existente.updated_at = now
-            return alerta_existente, "ACTUALIZADA_POST_COOLDOWN", None
+            accion = RulesEngine.determinar_accion(regla, alerta_existente)
+            return alerta_existente, "ACTUALIZADA_POST_COOLDOWN", accion
 
         # 3. No existe alerta abierta previa -> CREAR NUEVA ALERTA
         nueva_alerta = Alerta(
@@ -214,7 +235,7 @@ class RulesEngine:
             estado=EstadoAlerta.DETECTADA,
             valor_observado=anomalia.valor_observado,
             valor_referencia=anomalia.valor_referencia,
-            condicion_activadora=f"{regla.indicador_clave} = {anomalia.valor_observado}{indicador.unidad}",
+            condicion_activadora=f"{indicador.nombre} = {anomalia.valor_observado:g}{indicador.unidad}",
             explicacion=anomalia.descripcion,
             recomendacion=RulesEngine.generar_recomendacion_base(regla, anomalia, indicador),
             origen_explicacion="DETERMINISTICO",
@@ -225,6 +246,7 @@ class RulesEngine:
                 "valor_observado": anomalia.valor_observado,
                 "valor_referencia": anomalia.valor_referencia,
                 "unidad": indicador.unidad,
+                "umbrales": {"preventivo": regla.umbral_preventivo, "critico": regla.umbral_critico, "cierre": regla.umbral_cierre_histeresis},
                 "metadata": indicador.metadata
             },
             created_at=now,
@@ -241,7 +263,9 @@ class RulesEngine:
         elif regla.agente_tipo == TipoAgente.COMERCIAL:
             return f"Descenso de Nuevas Matrículas ({anomalia.valor_observado}%)"
         elif regla.agente_tipo == TipoAgente.RETENCION:
-            return f"Incremento de Clientes con Riesgo de Abandono ({anomalia.valor_observado}%)"
+            if anomalia.metadata.get("metodo") == "REGLA_INACTIVIDAD":
+                return f"Clientes con Inactividad Prolongada ({anomalia.valor_observado}%)"
+            return f"Clientes con Alto Riesgo de Abandono ({anomalia.valor_observado}%)"
         elif regla.agente_tipo == TipoAgente.OPERATIVO:
             return f"Disponibilidad Reducida de Equipos ({anomalia.valor_observado}%)"
         elif regla.agente_tipo == TipoAgente.SEGUIMIENTO:
@@ -335,7 +359,9 @@ class RulesEngine:
                 payload={
                     "requiere_autorizacion_humana": True,
                     "alerta_id": alerta.id,
-                    "accion": "Ajuste de política de capacidad o campañas comerciales"
+                    "accion": alerta.recomendacion,
+                    "valor_observado": alerta.valor_observado,
+                    "evidencia": alerta.evidencia_json,
                 }
             )
 

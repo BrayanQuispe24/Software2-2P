@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 class TipoAgente(str, Enum):
     AFORO = "AFORO"
@@ -44,7 +44,6 @@ class TipoEjecucion(str, Enum):
     PERIODICO = "PERIODICO"
     EVENTO = "EVENTO"
     MANUAL = "MANUAL"
-    SIMULACION = "SIMULACION"
 
 class IndicadorNegocio(BaseModel):
     nombre: str
@@ -55,7 +54,7 @@ class IndicadorNegocio(BaseModel):
     servicio_origen: str
     confiable: bool = True
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ReglaMonitoreo(BaseModel):
     id: str
@@ -67,10 +66,12 @@ class ReglaMonitoreo(BaseModel):
     umbral_critico: float
     umbral_cierre_histeresis: Optional[float] = None
     duracion_minima_seg: int = 0
+    horario_inicio: Optional[str] = None
+    horario_fin: Optional[str] = None
     cooldown_seg: int = 300
     nivel_autonomia: NivelAutonomia = NivelAutonomia.AUTOMATIZACION_CONTROLADA
     activa: bool = True
-    destinatarios: List[str] = Field(default_factory=lambda: ["admin@apexfitness.com"])
+    destinatarios: List[str] = Field(default_factory=list)
 
 class Anomalia(BaseModel):
     id: Optional[str] = None
@@ -84,7 +85,7 @@ class Anomalia(BaseModel):
     grado_confianza: float = 1.0
     descripcion: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Alerta(BaseModel):
     id: str
@@ -105,8 +106,9 @@ class Alerta(BaseModel):
     contador_ocurrencias: int = 1
     responsable: Optional[str] = None
     evidencia_json: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ultima_notificacion_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
 
 class AccionAgente(BaseModel):
@@ -119,7 +121,7 @@ class AccionAgente(BaseModel):
     payload: Dict[str, Any] = Field(default_factory=dict)
     resultado: Optional[str] = None
     aprobado_por: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     executed_at: Optional[datetime] = None
 
 class HistorialDecision(BaseModel):
@@ -133,7 +135,7 @@ class HistorialDecision(BaseModel):
     por_que_decidio: str
     resultado_posterior: Optional[str] = None
     nivel_autonomia: NivelAutonomia
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class EjecucionAgente(BaseModel):
     id: str
@@ -146,5 +148,5 @@ class EjecucionAgente(BaseModel):
     latencia_ms: float = 0.0
     completado: bool = True
     error: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

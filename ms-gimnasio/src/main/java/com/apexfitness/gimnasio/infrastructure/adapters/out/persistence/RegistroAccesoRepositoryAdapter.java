@@ -25,6 +25,13 @@ public class RegistroAccesoRepositoryAdapter implements RegistroAccesoRepository
     private final SpringDataBoletaInscripcionRepository inscripcionRepository;
 
     @Override
+    public List<RegistroAcceso> findPage(int pagina, int limite) {
+        return repository.findByFilter(null, PageRequest.of(pagina, limite)).stream()
+                .map(PersistenceMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<RegistroAcceso> findAll(UUID clienteId, int limite) {
         return repository.findByFilter(clienteId, PageRequest.of(0, limite)).stream()
                 .map(PersistenceMapper::toDomain)

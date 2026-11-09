@@ -3,6 +3,76 @@
    Paleta institucional: #162026, #1C272E, #5A7863, #90AB8B, #6EE7B7, #EBF4DD
    ========================================================================== */
 
+.rule-editor-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(900px, calc(100vw - 3rem));
+  max-width: none;
+  max-height: calc(100dvh - 3rem);
+  box-sizing: border-box;
+  padding: 0;
+  overflow-y: auto;
+  background: #1c272e;
+  color: #ebf4dd;
+  border: 1px solid #52675c;
+  border-radius: 12px;
+}
+.rule-editor-dialog::backdrop { background: rgba(0, 0, 0, .65); }
+.rule-editor-dialog .local-ai-panel { margin: 0; border: 0; }
+.rule-editor-dialog .rule-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+  align-items: start;
+}
+.rule-editor-dialog .rule-editor-fields input,
+.rule-editor-dialog .rule-editor-fields select { width: 100%; box-sizing: border-box; }
+.rule-editor-dialog .rule-editor-fields .rule-editor-active {
+  flex-direction: row;
+  align-items: center;
+  align-self: center;
+}
+.rule-editor-dialog .rule-editor-active input { width: auto; margin: 0; }
+.rule-editor-dialog .rule-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .75rem;
+  border-top: 1px solid #52675c;
+  padding-top: 1rem;
+}
+.rule-editor-dialog .rule-editor-actions button { width: auto; }
+@media (max-width: 600px) {
+  .rule-editor-dialog { width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); }
+  .rule-editor-dialog .rule-editor-fields { grid-template-columns: minmax(0, 1fr); }
+  .rule-editor-dialog .rule-editor-actions { flex-wrap: wrap; }
+}
+.local-ai-panel {
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(144, 171, 139, 0.3);
+  border-radius: 12px;
+  background: #1c272e;
+  color: #ebf4dd;
+  overflow-wrap: anywhere;
+}
+.local-ai-panel h2 { font-size: 1.15rem; }
+.local-ai-panel p { font-size: .9rem; }
+.local-ai-controls { display: flex; flex-wrap: wrap; align-items: end; gap: .8rem; margin: .8rem 0; }
+.local-ai-panel label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.local-ai-panel input, .local-ai-panel select, .local-ai-panel textarea {
+  padding: .6rem; background: #10161a; color: #ebf4dd; border: 1px solid #52675c; border-radius: 6px; max-width: 100%;
+}
+.local-ai-panel textarea { min-height: 8rem; width: 100%; box-sizing: border-box; }
+.local-ai-panel progress { width: 100%; }
+.local-ai-panel pre { overflow: auto; max-height: 20rem; }
+.local-ai-answer { white-space: pre-wrap; }
+.agent-action-item { padding: .85rem 0; border-bottom: 1px solid rgba(144, 171, 139, .2); }
+.agent-action-item:last-child { border-bottom: 0; }
+.agent-action-item p { margin: .35rem 0; }
+.agent-action-item .meta-chip { margin-left: .6rem; }
+.local-ai-draft { display: grid; gap: .8rem; margin-bottom: 1rem; }
 .monitoreo-container {
   display: flex;
   flex-direction: column;
@@ -404,12 +474,15 @@
 }
 
 .alerta-title-group {
+  min-width: 0;
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
 .alerta-title {
+  overflow-wrap: anywhere;
   font-family: 'Outfit', sans-serif;
   font-size: 1.15rem;
   font-weight: 700;
@@ -441,6 +514,8 @@
 }
 
 .meta-chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   background: rgba(22, 32, 38, 0.7);
   padding: 0.25rem 0.55rem;
   border-radius: 5px;
@@ -575,7 +650,7 @@
 /* --------------------------------------------------------------------------
    PANEL DEL SIMULADOR DE AFORO (SECCIÓN 7)
    -------------------------------------------------------------------------- */
-.simulator-panel {
+.tools-panel {
   background: linear-gradient(145deg, #1c272e 0%, #141c22 100%);
   border: 1px solid rgba(144, 171, 139, 0.25);
   border-radius: 14px;

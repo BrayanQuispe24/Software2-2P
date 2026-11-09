@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface InscripcionUseCase {
     BoletaInscripcion procesarInscripcion(ProcesarInscripcionCommand command);
     List<BoletaInscripcion> listarInscripciones(UUID clienteId, EstadoInscripcion estado);
+    List<BoletaInscripcion> listarInscripcionesPagina(int pagina, int limite);
     Optional<BoletaInscripcion> buscarPorId(UUID id);
     Optional<BoletaInscripcion> obtenerInscripcionActivaCliente(UUID clienteId);
     BoletaInscripcion congelarInscripcion(UUID id, String motivo);

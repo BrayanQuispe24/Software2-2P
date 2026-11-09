@@ -1,4 +1,5 @@
 import json
+from ..infrastructure.json_data import parse_json_object
 import uuid
 import time
 import logging
@@ -49,7 +50,7 @@ DEFAULT_RULES = [
         "umbral_cierre_histeresis": 85.0,
         "cooldown_seg": 300,
         "nivel_autonomia": NivelAutonomia.AUTOMATIZACION_CONTROLADA.value,
-        "destinatarios": ["operaciones@apexfitness.com", "recepcion@apexfitness.com"],
+        "destinatarios": [],
     },
     {
         "id": "RULE-COMERCIAL-01",
@@ -62,7 +63,7 @@ DEFAULT_RULES = [
         "umbral_cierre_histeresis": None,
         "cooldown_seg": 600,
         "nivel_autonomia": NivelAutonomia.AUTOMATIZACION_CONTROLADA.value,
-        "destinatarios": ["comercial@apexfitness.com", "gerencia@apexfitness.com"],
+        "destinatarios": [],
     },
     {
         "id": "RULE-RETENCION-01",
@@ -75,7 +76,7 @@ DEFAULT_RULES = [
         "umbral_cierre_histeresis": 15.0,
         "cooldown_seg": 600,
         "nivel_autonomia": NivelAutonomia.AUTOMATIZACION_CONTROLADA.value,
-        "destinatarios": ["fidelizacion@apexfitness.com"],
+        "destinatarios": [],
     },
     {
         "id": "RULE-OPERATIVO-01",
@@ -88,7 +89,7 @@ DEFAULT_RULES = [
         "umbral_cierre_histeresis": 80.0,
         "cooldown_seg": 300,
         "nivel_autonomia": NivelAutonomia.AUTOMATIZACION_CONTROLADA.value,
-        "destinatarios": ["mantenimiento@apexfitness.com"],
+        "destinatarios": [],
     },
     {
         "id": "RULE-SEGUIMIENTO-01",
@@ -101,7 +102,7 @@ DEFAULT_RULES = [
         "umbral_cierre_histeresis": None,
         "cooldown_seg": 300,
         "nivel_autonomia": NivelAutonomia.AUTOMATIZACION_CONTROLADA.value,
-        "destinatarios": ["supervisor@apexfitness.com", "director@apexfitness.com"],
+        "destinatarios": [],
     },
 ]
 
@@ -157,368 +158,213 @@ class AgentOrchestratorService:
         except Exception as e:
             db.rollback()
             logger.warning(f"Error seeding config: {e}")
+            raise
+
+    @staticmethod
+    def utc(value):
+        return value.replace(tzinfo=value.tzinfo or timezone.utc).astimezone(timezone.utc)
+
+    @staticmethod
+    def regla_activa_ahora(regla, now):
+        from zoneinfo import ZoneInfo
+        from ..config import settings
+        if not regla.activa:
+            return False
+        if not regla.horario_inicio or not regla.horario_fin:
+            return True
+        clock = now.astimezone(ZoneInfo(settings.MONITOR_TIMEZONE)).strftime("%H:%M")
+        inicio, fin = regla.horario_inicio, regla.horario_fin
+        return inicio <= clock < fin if inicio < fin else clock >= inicio or clock < fin
+
+    @staticmethod
+    def to_rule(row, maximo=4):
+        return ReglaMonitoreo(
+            id=row.id, agente_tipo=row.agente_tipo, nombre=row.nombre,
+            indicador_clave=row.indicador_clave, sede_id=row.sede_id,
+            umbral_preventivo=row.umbral_preventivo, umbral_critico=row.umbral_critico,
+            umbral_cierre_histeresis=row.umbral_cierre_histeresis,
+            duracion_minima_seg=row.duracion_minima_seg,
+            horario_inicio=row.horario_inicio, horario_fin=row.horario_fin,
+            cooldown_seg=row.cooldown_seg, nivel_autonomia=min(row.nivel_autonomia, maximo),
+            activa=row.activa, destinatarios=row.destinatarios)
+
+    @staticmethod
+    def to_alert(row):
+        fields = {name: getattr(row, name) for name in Alerta.model_fields if hasattr(row, name)}
+        fields["evidencia_json"] = parse_json_object(row.evidencia_json)
+        return Alerta(**fields)
 
     @classmethod
-    async def ejecutar_ciclo_completo(
-        cls,
-        db: Session,
-        tipo_ejecucion: TipoEjecucion = TipoEjecucion.PERIODICO,
-        sede_id: str = "SEDE-CENTRAL",
-        override_indicadores: Optional[Dict[str, float]] = None
-    ) -> Dict[str, Any]:
-        """
-        Ejecuta el ciclo O-A-D-A-E para los 5 agentes especializados.
-        override_indicadores permite forzar valores para simulaciones o pruebas controladas.
-        """
+    async def persist_action(cls, db, regla, alerta, accion):
+        if accion is None:
+            return 0
+        row = AccionAgenteModel(
+            id=accion.id, alerta_id=alerta.id, tipo_accion=accion.tipo_accion,
+            nivel_autonomia=accion.nivel_autonomia.value, estado=accion.estado.value,
+            destinatario=accion.destinatario, payload_json=json.dumps(accion.payload))
+        db.add(row)
+        # Persist the intent before any external side effect. The action id is the idempotency key.
+        db.flush()
+        alerta.ultima_notificacion_at = datetime.now(timezone.utc)
+        if accion.nivel_autonomia == NivelAutonomia.AUTOMATIZACION_CONTROLADA:
+            row.payload_json = json.dumps({**accion.payload, "accion_id": accion.id,
+                "destinatarios": regla.destinatarios})
+        return 1
+
+    @classmethod
+    async def dispatch_pending_actions(cls, db):
+        import asyncio
+        pending = db.query(AccionAgenteModel).filter_by(estado=EstadoAccion.SOLICITADA.value).with_for_update(skip_locked=True).limit(20).all()
+        async def deliver(action):
+            if action.nivel_autonomia == 4 and not action.aprobado_por:
+                action.estado = EstadoAccion.FALLIDA.value
+                action.resultado = "Falta autorización humana"
+                return
+            payload = parse_json_object(action.payload_json)
+            delivered = await GymToolsAdapter.solicitar_notificacion(action.alerta_id,
+                payload.get("destinatarios", []), {**payload, "accion_id": action.id})
+            action.estado = EstadoAccion.EJECUTADA.value if delivered else EstadoAccion.FALLIDA.value
+            action.resultado = "Solicitud entregada al workflow; no confirma cambios en otros servicios" if delivered else "Webhook no disponible o destinatarios sin configurar"
+            if delivered:
+                action.executed_at = datetime.now(timezone.utc)
+        await asyncio.gather(*(deliver(action) for action in pending))
+        db.commit()
+
+    @classmethod
+    async def ejecutar_ciclo_completo(cls, db: Session, tipo_ejecucion=TipoEjecucion.PERIODICO,
+                                     sede_id="SEDE-CENTRAL"):
+        import asyncio
+        from sqlalchemy import text
+        from ..config import settings
         cls.seed_initial_config_if_empty(db)
-        start_time = time.time()
-        ejecucion_id = f"EXEC-{uuid.uuid4().hex[:8].upper()}"
-
-        anomalias_detectadas = 0
-        alertas_generadas = 0
-        alertas_actualizadas = 0
-        acciones_disparadas = 0
-
-        # 1. OBSERVAR: Recolectar indicadores mediante herramientas autorizadas
-        indicadores: List[IndicadorNegocio] = []
-        is_simulation = (tipo_ejecucion == TipoEjecucion.SIMULACION)
-
-        # Aforo
-        if is_simulation and override_indicadores and "aforo_pct" in override_indicadores:
-            aforo_val = override_indicadores["aforo_pct"]
-            ind_aforo = IndicadorNegocio(
-                nombre="Ocupación de Aforo",
-                valor_actual=aforo_val,
-                valor_referencia=75.0,
-                unidad="%",
-                sede_id=sede_id,
-                servicio_origen="ms-gimnasio",
-                confiable=True,
-                metadata={"presentes": int(aforo_val), "capacidad_total": 100, "sede_id": sede_id}
-            )
-        else:
-            ind_aforo = await GymToolsAdapter.obtener_aforo_actual(sede_id)
-            if override_indicadores and "aforo_pct" in override_indicadores:
-                ind_aforo.valor_actual = override_indicadores["aforo_pct"]
-                cap = ind_aforo.metadata.get("capacidad_total", 100)
-                ind_aforo.metadata["presentes"] = int((ind_aforo.valor_actual / 100) * cap)
-        indicadores.append(ind_aforo)
-
-        # Comercial (Matrículas)
-        if is_simulation and override_indicadores and "matriculas_var_pct" in override_indicadores:
-            mat_val = override_indicadores["matriculas_var_pct"]
-            ind_comercial = IndicadorNegocio(
-                nombre="Variación de Nuevas Matrículas",
-                valor_actual=mat_val,
-                valor_referencia=0.0,
-                unidad="%",
-                sede_id=sede_id,
-                servicio_origen="ms-gimnasio",
-                confiable=True,
-                metadata={"matriculas_periodo_actual": 28, "matriculas_periodo_anterior": 40, "periodo": "semanal"}
-            )
-        else:
-            ind_comercial = await GymToolsAdapter.obtener_resumen_inscripciones("semanal", sede_id)
-            if override_indicadores and "matriculas_var_pct" in override_indicadores:
-                ind_comercial.valor_actual = override_indicadores["matriculas_var_pct"]
-        indicadores.append(ind_comercial)
-
-        # Retención (ML Churn)
-        if is_simulation and override_indicadores and "churn_alto_riesgo_pct" in override_indicadores:
-            churn_val = override_indicadores["churn_alto_riesgo_pct"]
-            ind_retencion = IndicadorNegocio(
-                nombre="Proporción Clientes Alto Riesgo Abandono",
-                valor_actual=churn_val,
-                valor_referencia=12.0,
-                unidad="%",
-                sede_id=sede_id,
-                servicio_origen="ms-machine-learning",
-                confiable=True,
-                metadata={"modelo": "RandomForestClassifier", "clientes_evaluados": 140, "umbral_score_riesgo": 0.70}
-            )
-        else:
-            ind_retencion = await GymToolsAdapter.obtener_resumen_riesgo_abandono(sede_id)
-            if override_indicadores and "churn_alto_riesgo_pct" in override_indicadores:
-                ind_retencion.valor_actual = override_indicadores["churn_alto_riesgo_pct"]
-        indicadores.append(ind_retencion)
-
-        # Operativo (Equipos)
-        if is_simulation and override_indicadores and "disponibilidad_equipos_pct" in override_indicadores:
-            disp_val = override_indicadores["disponibilidad_equipos_pct"]
-            ind_operativo = IndicadorNegocio(
-                nombre="Disponibilidad de Equipos Críticos",
-                valor_actual=disp_val,
-                valor_referencia=100.0,
-                unidad="%",
-                sede_id=sede_id,
-                servicio_origen="ms-inventario",
-                confiable=True,
-                metadata={"tipo_equipo": "Caminadoras / Cardio", "total_equipos": 5, "operativas": 2, "fuera_servicio": 3}
-            )
-        else:
-            ind_operativo = await GymToolsAdapter.obtener_equipos_fuera_servicio(sede_id)
-            if override_indicadores and "disponibilidad_equipos_pct" in override_indicadores:
-                ind_operativo.valor_actual = override_indicadores["disponibilidad_equipos_pct"]
-        indicadores.append(ind_operativo)
-
-        # 2. ANALIZAR & DECIDIR: Evaluar contra reglas activas
-        reglas_orm = db.query(ReglaMonitoreoModel).filter_by(activa=True).all()
-        reglas_map = {r.agente_tipo: r for r in reglas_orm}
-
-        alertas_procesadas = []
-
-        for ind in indicadores:
-            # Asociar indicador al tipo de agente correspondiente
-            agente_tipo = None
-            if ind.nombre == "Ocupación de Aforo":
-                agente_tipo = TipoAgente.AFORO.value
-            elif ind.nombre == "Variación de Nuevas Matrículas":
-                agente_tipo = TipoAgente.COMERCIAL.value
-            elif ind.nombre == "Proporción Clientes Alto Riesgo Abandono":
-                agente_tipo = TipoAgente.RETENCION.value
-            elif ind.nombre == "Disponibilidad de Equipos Críticos":
-                agente_tipo = TipoAgente.OPERATIVO.value
-
-            regla_orm = reglas_map.get(agente_tipo)
-            if not regla_orm:
+        start = time.monotonic()
+        now = datetime.now(timezone.utc)
+        ejecucion_id = f"EXEC-{uuid.uuid4().hex[:12].upper()}"
+        # Serialize periodic/manual cycles across workers, avoiding duplicate open alerts.
+        if db.bind.dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(8085001)"))
+        rules = db.query(ReglaMonitoreoModel).filter_by(sede_id=sede_id).all()
+        agents = {a.tipo: a for a in db.query(AgenteModel).all()}
+        sources = [
+            (TipoAgente.AFORO, GymToolsAdapter.obtener_aforo_actual(sede_id)),
+            (TipoAgente.COMERCIAL, GymToolsAdapter.obtener_resumen_inscripciones("semanal", sede_id)),
+            (TipoAgente.RETENCION, GymToolsAdapter.obtener_resumen_riesgo_abandono(sede_id)),
+            (TipoAgente.OPERATIVO, GymToolsAdapter.obtener_equipos_fuera_servicio(sede_id)),
+        ]
+        readings = await asyncio.gather(*(call for _, call in sources))
+        generated = updated = actions = anomalies = 0
+        processed = []
+        available = []
+        open_states = [e.value for e in EstadoAlerta if e != EstadoAlerta.RESUELTA]
+        for (kind, _), indicator in zip(sources, readings):
+            age = (datetime.now(timezone.utc) - cls.utc(indicator.timestamp)).total_seconds()
+            if age > settings.MAX_READING_AGE_SECONDS or age < -5:
+                indicator.confiable = False
+                indicator.metadata["error"] = "Lectura fuera de la ventana de vigencia"
+            available.append({"agente": kind.value, "disponible": indicator.confiable,
+                "motivo": indicator.metadata.get("error"), "servicio": indicator.servicio_origen})
+            db.add(LecturaIndicadorModel(id=f"LEC-{uuid.uuid4().hex}", ejecucion_id=ejecucion_id,
+                nombre=indicator.nombre, valor_actual=indicator.valor_actual,
+                valor_referencia=indicator.valor_referencia, unidad=indicator.unidad,
+                sede_id=sede_id, servicio_origen=indicator.servicio_origen,
+                confiable=indicator.confiable, metadata_json=json.dumps(indicator.metadata)))
+            for rule_row in (r for r in rules if r.agente_tipo == kind.value):
+                agent = agents.get(kind.value)
+                if not agent or not agent.activo or not cls.regla_activa_ahora(rule_row, now):
+                    rule_row.anomalia_desde = None
+                    continue
+                rule = cls.to_rule(rule_row, agent.nivel_autonomia_maximo)
+                anomaly, _ = RulesEngine.evaluar_indicador(rule, indicator)
+                if not indicator.confiable or not anomaly:
+                    rule_row.anomalia_desde = None
+                elif rule_row.anomalia_desde is None:
+                    rule_row.anomalia_desde = now
+                if anomaly and (now - cls.utc(rule_row.anomalia_desde)).total_seconds() < rule.duracion_minima_seg:
+                    continue
+                existing = db.query(AlertaModel).filter(AlertaModel.regla_id == rule.id,
+                    AlertaModel.sede_id == sede_id, AlertaModel.estado.in_(open_states)).first()
+                if rule.nivel_autonomia == NivelAutonomia.OBSERVACION:
+                    continue
+                result, change, action = RulesEngine.procesar_alerta_con_deduplicacion(
+                    rule, anomaly, indicator, cls.to_alert(existing) if existing else None)
+                if anomaly:
+                    anomalies += 1
+                    db.add(AnomaliaModel(id=anomaly.id, regla_id=rule.id, agente_tipo=kind.value,
+                        sede_id=sede_id, indicador_clave=rule.indicador_clave,
+                        valor_observado=anomaly.valor_observado, valor_referencia=anomaly.valor_referencia,
+                        severidad=anomaly.severidad.value, grado_confianza=anomaly.grado_confianza,
+                        descripcion=anomaly.descripcion, metadata_json=json.dumps(anomaly.metadata)))
+                if result is None:
+                    continue
+                if existing is None:
+                    existing = AlertaModel(id=result.id)
+                    db.add(existing)
+                    generated += 1
+                elif change != "COOLDOWN_IGNORADA":
+                    updated += 1
+                for field in Alerta.model_fields:
+                    if hasattr(AlertaModel, field):
+                        value = getattr(result, field)
+                        if hasattr(value, "value"):
+                            value = value.value
+                        setattr(existing, field, json.dumps(value) if field == "evidencia_json" else value)
+                actions += await cls.persist_action(db, rule, existing, action)
+                processed.append({"id": result.id, "titulo": result.titulo,
+                    "severidad": result.severidad.value, "accion_tipo": change,
+                    "valor_observado": result.valor_observado})
+                if change != "COOLDOWN_IGNORADA":
+                    db.add(HistorialDecisionModel(id=f"DEC-{uuid.uuid4().hex}", ejecucion_id=ejecucion_id,
+                        agente_tipo=kind.value, sede_id=sede_id, alerta_id=result.id,
+                        que_observo=f"{indicator.nombre}: {indicator.valor_actual}{indicator.unidad}",
+                        que_decidio=change, por_que_decidio=f"Regla {rule.id}; evidencia del servicio {indicator.servicio_origen}",
+                        nivel_autonomia=rule.nivel_autonomia.value))
+        db.flush()
+        # Follow-up obeys its own rule and autonomy cap, including disabled rules and hours.
+        for follow in (r for r in rules if r.agente_tipo == TipoAgente.SEGUIMIENTO.value):
+            agent = agents.get(TipoAgente.SEGUIMIENTO.value)
+            if not agent or not agent.activo or not cls.regla_activa_ahora(follow, now):
                 continue
-
-            regla = ReglaMonitoreo(
-                id=regla_orm.id,
-                agente_tipo=TipoAgente(regla_orm.agente_tipo),
-                nombre=regla_orm.nombre,
-                indicador_clave=regla_orm.indicador_clave,
-                sede_id=regla_orm.sede_id,
-                umbral_preventivo=regla_orm.umbral_preventivo,
-                umbral_critico=regla_orm.umbral_critico,
-                umbral_cierre_histeresis=regla_orm.umbral_cierre_histeresis,
-                cooldown_seg=regla_orm.cooldown_seg,
-                nivel_autonomia=NivelAutonomia(regla_orm.nivel_autonomia),
-                activa=regla_orm.activa,
-                destinatarios=regla_orm.destinatarios
-            )
-
-            # Persistir lectura de indicador
-            lectura_orm = LecturaIndicadorModel(
-                id=f"LEC-{uuid.uuid4().hex[:8].upper()}",
-                ejecucion_id=ejecucion_id,
-                nombre=ind.nombre,
-                valor_actual=ind.valor_actual,
-                valor_referencia=ind.valor_referencia,
-                unidad=ind.unidad,
-                sede_id=ind.sede_id,
-                servicio_origen=ind.servicio_origen,
-                confiable=ind.confiable,
-                metadata_json=json.dumps(ind.metadata)
-            )
-            db.add(lectura_orm)
-
-            # Evaluar anomalía
-            anomalia, condicion = RulesEngine.evaluar_indicador(regla, ind)
-
-            # Consultar alerta abierta existente para deduplicación
-            alerta_existente_orm = (
-                db.query(AlertaModel)
-                .filter(
-                    AlertaModel.regla_id == regla.id,
-                    AlertaModel.sede_id == regla.sede_id,
-                    AlertaModel.estado.in_([
-                        EstadoAlerta.DETECTADA.value,
-                        EstadoAlerta.NOTIFICADA.value,
-                        EstadoAlerta.EN_ATENCION.value,
-                        EstadoAlerta.ESCALADA.value
-                    ])
-                )
-                .first()
-            )
-
-            alerta_existente = None
-            if alerta_existente_orm:
-                alerta_existente = Alerta(
-                    id=alerta_existente_orm.id,
-                    regla_id=alerta_existente_orm.regla_id,
-                    agente_tipo=TipoAgente(alerta_existente_orm.agente_tipo),
-                    sede_id=alerta_existente_orm.sede_id,
-                    titulo=alerta_existente_orm.titulo,
-                    severidad=SeveridadAlerta(alerta_existente_orm.severidad),
-                    estado=EstadoAlerta(alerta_existente_orm.estado),
-                    valor_observado=alerta_existente_orm.valor_observado,
-                    valor_referencia=alerta_existente_orm.valor_referencia,
-                    condicion_activadora=alerta_existente_orm.condicion_activadora,
-                    explicacion=alerta_existente_orm.explicacion,
-                    recomendacion=alerta_existente_orm.recomendacion,
-                    origen_explicacion=alerta_existente_orm.origen_explicacion,
-                    modelo_ia_browser=alerta_existente_orm.modelo_ia_browser,
-                    grado_confianza=alerta_existente_orm.grado_confianza,
-                    contador_ocurrencias=alerta_existente_orm.contador_ocurrencias,
-                    evidencia_json=json.loads(alerta_existente_orm.evidencia_json or "{}"),
-                    created_at=alerta_existente_orm.created_at,
-                    updated_at=alerta_existente_orm.updated_at
-                )
-
-            alerta_res, accion_tipo, accion_agente = RulesEngine.procesar_alerta_con_deduplicacion(
-                regla, anomalia, ind, alerta_existente
-            )
-
-            if anomalia:
-                anomalias_detectadas += 1
-                anomalia_orm = AnomaliaModel(
-                    id=anomalia.id,
-                    regla_id=anomalia.regla_id,
-                    agente_tipo=anomalia.agente_tipo.value,
-                    sede_id=anomalia.sede_id,
-                    indicador_clave=anomalia.indicador_clave,
-                    valor_observado=anomalia.valor_observado,
-                    valor_referencia=anomalia.valor_referencia,
-                    severidad=anomalia.severidad.value,
-                    grado_confianza=anomalia.grado_confianza,
-                    descripcion=anomalia.descripcion,
-                    metadata_json=json.dumps(anomalia.metadata)
-                )
-                db.add(anomalia_orm)
-
-            # Persistir cambios de la alerta
-            if alerta_res:
-                if accion_tipo == "CREADA":
-                    alertas_generadas += 1
-                    nuevo_alerta_orm = AlertaModel(
-                        id=alerta_res.id,
-                        regla_id=alerta_res.regla_id,
-                        agente_tipo=alerta_res.agente_tipo.value,
-                        sede_id=alerta_res.sede_id,
-                        titulo=alerta_res.titulo,
-                        severidad=alerta_res.severidad.value,
-                        estado=alerta_res.estado.value,
-                        valor_observado=alerta_res.valor_observado,
-                        valor_referencia=alerta_res.valor_referencia,
-                        condicion_activadora=alerta_res.condicion_activadora,
-                        explicacion=alerta_res.explicacion,
-                        recomendacion=alerta_res.recomendacion,
-                        origen_explicacion=alerta_res.origen_explicacion,
-                        grado_confianza=alerta_res.grado_confianza,
-                        contador_ocurrencias=alerta_res.contador_ocurrencias,
-                        evidencia_json=json.dumps(alerta_res.evidencia_json)
-                    )
-                    db.add(nuevo_alerta_orm)
-                elif accion_tipo in ["ESCALADA", "COOLDOWN_IGNORADA", "ACTUALIZADA_POST_COOLDOWN", "RESUELTA_POR_HISTERESIS"]:
-                    if accion_tipo == "ESCALADA":
-                        alertas_actualizadas += 1
-                    alerta_existente_orm.severidad = alerta_res.severidad.value
-                    alerta_existente_orm.estado = alerta_res.estado.value
-                    alerta_existente_orm.valor_observado = alerta_res.valor_observado
-                    alerta_existente_orm.contador_ocurrencias = alerta_res.contador_ocurrencias
-                    alerta_existente_orm.explicacion = alerta_res.explicacion
-                    alerta_existente_orm.recomendacion = alerta_res.recomendacion
-                    alerta_existente_orm.evidencia_json = json.dumps(alerta_res.evidencia_json)
-                    alerta_existente_orm.updated_at = datetime.now(timezone.utc)
-                    if alerta_res.resolved_at:
-                        alerta_existente_orm.resolved_at = datetime.now(timezone.utc)
-
-                alertas_procesadas.append({
-                    "id": alerta_res.id,
-                    "titulo": alerta_res.titulo,
-                    "severidad": alerta_res.severidad.value,
-                    "accion_tipo": accion_tipo,
-                    "valor_observado": alerta_res.valor_observado
-                })
-
-                # 3. ACTUAR: Despachar acción si aplica según autonomía
-                if accion_agente:
-                    acciones_disparadas += 1
-                    accion_orm = AccionAgenteModel(
-                        id=accion_agente.id,
-                        alerta_id=accion_agente.alerta_id,
-                        tipo_accion=accion_agente.tipo_accion,
-                        nivel_autonomia=accion_agente.nivel_autonomia.value,
-                        estado=accion_agente.estado.value,
-                        destinatario=accion_agente.destinatario,
-                        payload_json=json.dumps(accion_agente.payload)
-                    )
-                    db.add(accion_orm)
-
-                    if accion_agente.nivel_autonomia == NivelAutonomia.AUTOMATIZACION_CONTROLADA:
-                        # Disparar webhook n8n solo en ejecuciones reales
-                        if not is_simulation:
-                            await GymToolsAdapter.solicitar_notificacion(
-                                alerta_res.id,
-                                regla.destinatarios,
-                                accion_agente.payload
-                            )
-                        accion_orm.estado = EstadoAccion.EJECUTADA.value
-                        accion_orm.executed_at = datetime.now(timezone.utc)
-
-                # Registrar auditoría de decisión
-                historial_orm = HistorialDecisionModel(
-                    id=f"DEC-{uuid.uuid4().hex[:8].upper()}",
-                    ejecucion_id=ejecucion_id,
-                    agente_tipo=regla.agente_tipo.value,
-                    sede_id=regla.sede_id,
-                    alerta_id=alerta_res.id,
-                    que_observo=f"{ind.nombre}: {ind.valor_actual}{ind.unidad} (Ref: {ind.valor_referencia or 'N/A'})",
-                    que_decidio=f"Acción {accion_tipo} con severidad {alerta_res.severidad.value}",
-                    por_que_decidio=f"Regla {regla.id} evaluada ({regla.indicador_clave}). Autonomía Nivel {regla.nivel_autonomia.value}.",
-                    nivel_autonomia=regla.nivel_autonomia.value
-                )
-                db.add(historial_orm)
-
-        # 4. AGENTE DE SEGUIMIENTO: Supervisar SLA de alertas abiertas
-        alertas_abiertas = (
-            db.query(AlertaModel)
-            .filter(AlertaModel.estado.in_([EstadoAlerta.DETECTADA.value, EstadoAlerta.NOTIFICADA.value]))
-            .all()
-        )
-        now_utc = datetime.now(timezone.utc)
-        for ab in alertas_abiertas:
-            created = ab.created_at.replace(tzinfo=timezone.utc if ab.created_at.tzinfo is None else ab.created_at.tzinfo)
-            mins_abierta = (now_utc - created).total_seconds() / 60.0
-            if mins_abierta >= 30.0 and ab.estado != EstadoAlerta.ESCALADA.value:
-                ab.estado = EstadoAlerta.ESCALADA.value
-                ab.severidad = SeveridadAlerta.CRITICA.value
-                ab.explicacion += f" | ESCALAMIENTO POR SEGUIMIENTO: Alerta abierta durante {round(mins_abierta, 1)} minutos sin atención."
-                ab.updated_at = now_utc
-                alertas_actualizadas += 1
-
-                # Auditoría de seguimiento
-                db.add(HistorialDecisionModel(
-                    id=f"DEC-{uuid.uuid4().hex[:8].upper()}",
-                    ejecucion_id=ejecucion_id,
-                    agente_tipo=TipoAgente.SEGUIMIENTO.value,
-                    sede_id=ab.sede_id,
-                    alerta_id=ab.id,
-                    que_observo=f"Alerta {ab.id} abierta por {round(mins_abierta, 1)} min sin resolución",
-                    que_decidio="Escalar alerta a CRITICA por vencimiento de SLA",
-                    por_que_decidio="Agente de seguimiento verificó inactividad superior a 30 minutos.",
-                    nivel_autonomia=NivelAutonomia.AUTOMATIZACION_CONTROLADA.value
-                ))
-
-        # Registrar ejecución del ciclo
-        latencia_ms = round((time.time() - start_time) * 1000, 2)
-        ejecucion_orm = EjecucionAgenteModel(
-            id=ejecucion_id,
-            agente_tipo="SISTEMA_MULTIAGENTE_GLOBAL",
-            tipo_ejecucion=tipo_ejecucion.value,
-            anomalias_detectadas=anomalias_detectadas,
-            alertas_generadas=alertas_generadas,
-            alertas_actualizadas=alertas_actualizadas,
-            acciones_disparadas=acciones_disparadas,
-            latencia_ms=latencia_ms,
-            completado=True
-        )
-        db.add(ejecucion_orm)
-
+            rule = cls.to_rule(follow, agent.nivel_autonomia_maximo)
+            if rule.nivel_autonomia == NivelAutonomia.OBSERVACION:
+                continue
+            candidates = db.query(AlertaModel).filter(AlertaModel.sede_id == sede_id,
+                AlertaModel.estado.in_([EstadoAlerta.DETECTADA.value, EstadoAlerta.NOTIFICADA.value])).all()
+            for alert in candidates:
+                elapsed = (now - cls.utc(alert.created_at)).total_seconds()
+                if elapsed < max(rule.umbral_preventivo * 60, rule.duracion_minima_seg):
+                    continue
+                evidence = parse_json_object(alert.evidencia_json)
+                last = evidence.get("seguimiento_at")
+                if last and (now - cls.utc(datetime.fromisoformat(last))).total_seconds() < rule.cooldown_seg:
+                    continue
+                critical = elapsed >= rule.umbral_critico * 60
+                if critical:
+                    alert.estado, alert.severidad = EstadoAlerta.ESCALADA.value, SeveridadAlerta.CRITICA.value
+                evidence["seguimiento_at"] = now.isoformat()
+                alert.evidencia_json = json.dumps(evidence)
+                alert.updated_at = now
+                db.add(HistorialDecisionModel(id=f"DEC-{uuid.uuid4().hex}", ejecucion_id=ejecucion_id,
+                    agente_tipo=TipoAgente.SEGUIMIENTO.value, sede_id=sede_id, alerta_id=alert.id,
+                    que_observo=f"Sin atención durante {elapsed/60:.1f} minutos",
+                    que_decidio="ESCALADA_SLA" if critical else "AVISO_SLA",
+                    por_que_decidio=f"Regla {follow.id}: {rule.umbral_preventivo}/{rule.umbral_critico} minutos",
+                    nivel_autonomia=rule.nivel_autonomia.value))
+                actions += await cls.persist_action(db, rule, alert, RulesEngine.determinar_accion(rule, cls.to_alert(alert)))
+                updated += 1
+        latency = round((time.monotonic()-start)*1000, 2)
+        db.add(EjecucionAgenteModel(id=ejecucion_id, agente_tipo="SISTEMA_MULTIAGENTE_GLOBAL",
+            tipo_ejecucion=tipo_ejecucion.value, anomalias_detectadas=anomalies,
+            alertas_generadas=generated, alertas_actualizadas=updated, acciones_disparadas=actions,
+            latencia_ms=latency, completado=True))
         try:
             db.commit()
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error al commitear ejecución: {e}")
-
-        return {
-            "ejecucion_id": ejecucion_id,
-            "anomalias_detectadas": anomalias_detectadas,
-            "alertas_generadas": alertas_generadas,
-            "alertas_actualizadas": alertas_actualizadas,
-            "acciones_disparadas": acciones_disparadas,
-            "latencia_ms": latencia_ms,
-            "alertas_procesadas": alertas_procesadas,
-            "indicadores_evaluados": len(indicadores)
-        }
+            raise
+        # Outbox: effects only after the facts, alert and intent have committed.
+        await cls.dispatch_pending_actions(db)
+        return {"ejecucion_id": ejecucion_id, "anomalias_detectadas": anomalies,
+            "alertas_generadas": generated, "alertas_actualizadas": updated,
+            "acciones_disparadas": actions, "latencia_ms": latency,
+            "alertas_procesadas": processed, "indicadores_evaluados": len(readings),
+            "fuentes": available}

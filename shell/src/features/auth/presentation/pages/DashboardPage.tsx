@@ -84,7 +84,7 @@ export function DashboardPage() {
                   <Link to="/admin/monitoreo-inteligente" className="module-link" style={{ borderLeft: '3px solid #818cf8' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                       <Activity size={18} style={{ color: '#818cf8' }} />
-                      <span>Centro de Monitoreo Inteligente (CU-23)</span>
+                      <span>Centro de monitoreo</span>
                     </span>
                     <span className="badge badge-mini" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
                       IA AUTÓNOMA

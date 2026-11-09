@@ -30,6 +30,11 @@ public class InscripcionGraphQLController {
     private final CatalogoUseCase catalogoUseCase;
 
     @QueryMapping
+    public List<BoletaInscripcion> inscripcionesPagina(@Argument Integer pagina, @Argument Integer limite) {
+        return inscripcionUseCase.listarInscripcionesPagina(pagina != null ? pagina : 0, limite != null ? limite : 500);
+    }
+
+    @QueryMapping
     public List<BoletaInscripcion> inscripciones(@Argument UUID clienteId, @Argument EstadoInscripcion estado) {
         return inscripcionUseCase.listarInscripciones(clienteId, estado);
     }

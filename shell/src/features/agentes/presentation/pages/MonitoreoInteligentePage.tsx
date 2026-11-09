@@ -1,73 +1,97 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import axios from 'axios';
 import {
   Activity,
-  Cpu,
   ShieldAlert,
-  Sliders,
   CheckCircle,
-  Play,
-  RotateCcw,
-  Sparkles,
   Layers,
-  Wrench,
-  Users,
-  TrendingDown,
   RefreshCw,
   Terminal,
-  Clock,
   Check,
 } from 'lucide-react';
-import { browserAiEngine, type ModelLoadingState, type AlertaData } from '../../infrastructure/browserAiEngine';
+import type { AlertaData } from '../../infrastructure/alertaData';
 import '../styles/monitoreo-inteligente.css';
+import { formatAlertCondition } from '../formatAlertCondition';
+import { RuleEditor } from '../components/RuleEditor';
+import { useSessionQuery } from '../../../auth/presentation/hooks/useSessionQuery';
+
+const LocalAiPanel = lazy(() => import('../components/LocalAiPanel').then((module) => ({ default: module.LocalAiPanel })));
+
+interface AgentAction {
+  id: string;
+  alerta_id: string;
+  tipo_accion: string;
+  estado: string;
+  nivel_autonomia: number;
+  resultado?: string | null;
+  propuesta?: string | null;
+  regla_id?: string | null;
+  motivo_bloqueo?: string | null;
+  puede_despachar?: boolean;
+}
 
 interface DashboardSummary {
   monitoreo_activo: boolean;
-  aforo_actual_pct: number;
-  aforo_presentes: number;
-  aforo_capacidad: number;
+  fuentes: { nombre: string; disponible: boolean; motivo?: string }[];
+  aforo_actual_pct: number | null;
+  aforo_presentes: number | null;
+  aforo_capacidad: number | null;
   alertas_abiertas: number;
   alertas_criticas: number;
   reglas_activas: number;
   agentes: { id: string; tipo: string; nombre: string; activo: boolean; nivel_autonomia: number }[];
   metricas_validacion: {
-    precision_alertas_pct: number;
-    tasa_falsas_alarmas_pct: number;
-    latencia_media_segundos: number;
+    precision_alertas_pct: number | null;
+    tasa_falsas_alarmas_pct: number | null;
+    latencia_media_segundos: number | null;
     acciones_sensibles_no_autorizadas: number;
-    duplicados_indebidos: number;
+    duplicados_indebidos: number | null;
     total_alertas_historicas: number;
     alertas_resueltas: number;
   };
 }
 
 export const MonitoreoInteligentePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'monitoreo' | 'simulador' | 'reglas' | 'herramientas'>('monitoreo');
+  const [activeTab, setActiveTab] = useState<'monitoreo' | 'reglas' | 'herramientas'>('monitoreo');
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [alertas, setAlertas] = useState<AlertaData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [analyzingAlertId, setAnalyzingAlertId] = useState<string | null>(null);
-  const [streamingText, setStreamingText] = useState<Record<string, string>>({});
-
-  // Estado del Motor de IA en Navegador
-  const [aiState, setAiState] = useState<ModelLoadingState>(browserAiEngine.getState());
-  const [selectedModel, setSelectedModel] = useState<string>('SmolLM2-360M-Instruct-q4f16_1-MLC');
-
-  const AVAILABLE_MODELS = [
-    { id: 'SmolLM2-360M-Instruct-q4f16_1-MLC', name: 'SmolLM2 360M (Ultra Rápido • ~200MB)' },
-    { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 1B (Recomendado • ~700MB)' },
-    { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 0.5B (Ligero • ~350MB)' },
-    { id: 'Gemma-2-2B-It-q4f16_1-MLC', name: 'Gemma 2 2B (Alta Precisión • ~1.4GB)' },
-  ];
-
-  // Simulador de Aforo
-  const [capacidadMax, setCapacidadMax] = useState(100);
-  const [personasPresentes, setPersonasPresentes] = useState(92);
-  const [umbralPrev, setUmbralPrev] = useState(90);
-  const [umbralCrit, setUmbralCrit] = useState(100);
-  const [umbralHist, setUmbralHist] = useState(85);
-  const [simResultado, setSimResultado] = useState<any>(null);
-
+  const [error, setError] = useState('');
+  const [editingRule, setEditingRule] = useState<any>(null);
+  const [actions, setActions] = useState<AgentAction[]>([]);
+  const [busyActions, setBusyActions] = useState<Record<string, boolean>>({});
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
+  const submitAction = async (action: AgentAction, operation: 'autorizar' | 'ejecutar', body?: object) => {
+    if (busyActions[action.id]) return;
+    setBusyActions((previous) => ({ ...previous, [action.id]: true }));
+    setActionErrors((previous) => ({ ...previous, [action.id]: '' }));
+    try {
+      await axios.post(`/api/agentes/acciones/${action.id}/${operation}`, body);
+      await fetchData();
+    } catch (error) {
+      const detail = axios.isAxiosError(error) ? error.response?.data?.detail : null;
+      setActionErrors((previous) => ({ ...previous, [action.id]: typeof detail === 'string' ? detail : 'No se pudo procesar la acción. Inténtalo más tarde.' }));
+    } finally {
+      setBusyActions((previous) => ({ ...previous, [action.id]: false }));
+    }
+  };
+  const groupedActions = Array.from(actions.reduce<Map<string, AgentAction & { repeticiones: number }>>((groups, action) => {
+    // Keep independent proposals separate; collapse repeated informational events per alert.
+    const key = action.nivel_autonomia === 4 ? action.id :
+      JSON.stringify([action.alerta_id, action.tipo_accion, action.estado, action.resultado, action.propuesta]);
+    const group = groups.get(key);
+    if (group) group.repeticiones += 1;
+    else groups.set(key, { ...action, repeticiones: 1 });
+    return groups;
+  }, new Map()).values());
+  const actionLabels: Record<string, string> = {
+    NOTIFICACION_INTERNA_DASHBOARD: 'Aviso en el panel',
+    RECOMENDAR_PLAN_ACCION: 'Recomendación',
+    DESPACHAR_WEBHOOK_N8N: 'Notificación al workflow',
+    MODIFICAR_POLITICA_O_CAMPANA_SENSIBLE: 'Propuesta que requiere aprobación',
+  };
+  const { data: session } = useSessionQuery();
+  const isAdmin = session?.user.roles.includes('ADMINISTRADOR') ?? false;
   // Reglas
   const [reglas, setReglas] = useState<any[]>([]);
 
@@ -78,29 +102,25 @@ export const MonitoreoInteligentePage: React.FC = () => {
   // Historial
   const [historial, setHistorial] = useState<any[]>([]);
 
-  // Suscripción al motor de IA Local en el Navegador
-  useEffect(() => {
-    const unsubscribe = browserAiEngine.subscribe((state) => {
-      setAiState(state);
-    });
-    return () => unsubscribe();
-  }, []);
-
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sumRes, alertRes, regRes, histRes] = await Promise.all([
+      const [sumRes, alertRes, regRes, histRes, actionRes] = await Promise.all([
         axios.get('/api/agentes/dashboard/summary'),
         axios.get('/api/agentes/alertas'),
         axios.get('/api/agentes/reglas'),
         axios.get('/api/agentes/historial?limit=20'),
+        axios.get('/api/agentes/acciones'),
       ]);
       setSummary(sumRes.data);
       setAlertas(alertRes.data);
       setReglas(regRes.data);
       setHistorial(histRes.data);
+      setActions(actionRes.data);
+      setError('');
     } catch (e) {
       console.warn('Error al cargar datos de ms-agentes:', e);
+      setError('No se pudieron actualizar los datos del monitoreo.');
     } finally {
       setLoading(false);
     }
@@ -111,72 +131,6 @@ export const MonitoreoInteligentePage: React.FC = () => {
     const interval = setInterval(fetchData, 25000);
     return () => clearInterval(interval);
   }, []);
-
-  // Simulación interactiva de regla de aforo en vivo
-  useEffect(() => {
-    const runSim = async () => {
-      try {
-        const res = await axios.post('/api/agentes/simulador/aforo', {
-          capacidad_maxima: capacidadMax,
-          personas_presentes: personasPresentes,
-          umbral_preventivo: umbralPrev,
-          umbral_critico: umbralCrit,
-          umbral_histeresis: umbralHist,
-        });
-        setSimResultado(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    runSim();
-  }, [capacidadMax, personasPresentes, umbralPrev, umbralCrit, umbralHist]);
-
-  const handleRunScenario = async (escenario: string) => {
-    setLoading(true);
-    try {
-      await axios.post('/api/agentes/evaluaciones/ejecutar', {
-        tipo_ejecucion: 'SIMULACION',
-        escenario,
-      });
-      await fetchData();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAnalyzeWithBrowserAi = async (alerta: AlertaData) => {
-    if (!aiState.isLoaded) {
-      await browserAiEngine.loadModel();
-    }
-
-    setAnalyzingAlertId(alerta.id);
-    setStreamingText((prev) => ({ ...prev, [alerta.id]: '' }));
-
-    try {
-      const result = await browserAiEngine.generateExplanation(alerta, (chunk) => {
-        setStreamingText((prev) => ({
-          ...prev,
-          [alerta.id]: (prev[alerta.id] || '') + chunk,
-        }));
-      });
-
-      // Sincronizar hacia el backend
-      await browserAiEngine.syncExplanationWithBackend(
-        alerta.id,
-        result.explicacion,
-        result.recomendacion,
-        result.tokensSegundo
-      );
-
-      await fetchData();
-    } catch (err) {
-      console.error('Error al analizar con IA Local:', err);
-    } finally {
-      setAnalyzingAlertId(null);
-    }
-  };
 
   const handleUpdateEstadoAlerta = async (id: string, nuevoEstado: string) => {
     try {
@@ -193,7 +147,8 @@ export const MonitoreoInteligentePage: React.FC = () => {
   const handleExecuteTool = async (toolName: string, params: Record<string, any> = {}) => {
     setExecutingTool(true);
     try {
-      const res = await browserAiEngine.executeTool(toolName, params);
+      const response = await axios.post('/api/agentes/tools/execute', { tool_name: toolName, params });
+      const res = response.data;
       setToolOutput(res);
     } catch (err: any) {
       setToolOutput({ error: err.message });
@@ -210,151 +165,88 @@ export const MonitoreoInteligentePage: React.FC = () => {
           <div className="monitoreo-title">
             <h1>
               <Activity color="#6ee7b7" size={26} />
-              Centro de Monitoreo Inteligente <span>(CU-23)</span>
+              Centro de monitoreo
             </h1>
             <p>
-              Supervisor autónomo digital • Ciclo continuo <strong>O-A-D-A-E</strong> con histéresis y control de autonomía (Niveles 0 al 4).
+              Consulta la actividad del gimnasio, atiende alertas y revisa las reglas de monitoreo.
             </p>
           </div>
           <div className="monitoreo-actions">
             <div className="status-badge-active">
               <span className="status-dot-pulse" />
-              Monitoreo Activo (30s)
+              {summary ? (summary.monitoreo_activo ? 'Monitoreo activo' : 'Monitoreo inactivo') : 'Conectando…'}
             </div>
             <button className="btn-secondary" onClick={fetchData} disabled={loading}>
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
               Actualizar
             </button>
+            <button className="btn-secondary" disabled={loading} onClick={async () => {
+              setLoading(true);
+              try { await axios.post('/api/agentes/evaluaciones/ejecutar', {}); await fetchData(); }
+              catch { setError('La evaluación no pudo completarse.'); }
+              finally { setLoading(false); }
+            }}>Evaluar datos actuales</button>
           </div>
         </div>
 
-        {/* Banner de IA Local en el Navegador (WebGPU / WASM) */}
-        <div className="browser-ai-banner">
-          <div className="browser-ai-top">
-            <div className="browser-ai-info">
-              <div
-                style={{
-                  background: 'rgba(90, 120, 99, 0.25)',
-                  padding: '0.45rem',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid rgba(144, 171, 139, 0.3)',
-                }}
-              >
-                <Cpu size={22} color="#6ee7b7" />
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontWeight: 700, color: '#ebf4dd', fontSize: '0.9rem' }}>Motor de IA Local en Navegador</span>
-                  <span className="ai-chip">{aiState.engine}</span>
-                </div>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: '#9bb0a5' }}>{aiState.statusText}</p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              {aiState.tokensSec && (
-                <span style={{ fontSize: '0.825rem', color: '#6ee7b7', fontWeight: 600 }}>
-                  ⚡ {aiState.tokensSec} tokens/seg
-                </span>
-              )}
-
-              {!aiState.isLoaded ? (
-                <>
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    disabled={aiState.isLoading}
-                    className="browser-ai-select"
-                  >
-                    {AVAILABLE_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    className="btn-primary"
-                    onClick={() => browserAiEngine.loadModel(selectedModel)}
-                    disabled={aiState.isLoading}
-                  >
-                    <Sparkles size={15} />
-                    {aiState.isLoading ? 'Descargando...' : 'Cargar IA en Navegador'}
-                  </button>
-                </>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6ee7b7', fontSize: '0.85rem', fontWeight: 700 }}>
-                  <CheckCircle size={17} />
-                  <span>Modelo Listo: <strong>{aiState.modelName}</strong></span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {aiState.isLoading && (
-            <div className="browser-ai-progress-bar">
-              <div className="browser-ai-progress-fill" style={{ width: `${aiState.progress}%` }} />
-            </div>
-          )}
-        </div>
-
-        {/* Navegación por Pestañas */}
         <div className="tabs-navigation">
           <button
             className={`tab-btn ${activeTab === 'monitoreo' ? 'active' : ''}`}
             onClick={() => setActiveTab('monitoreo')}
           >
             <Activity size={16} />
-            Alertas & Monitoreo en Vivo
+            Monitoreo y alertas
           </button>
-          <button
-            className={`tab-btn ${activeTab === 'simulador' ? 'active' : ''}`}
-            onClick={() => setActiveTab('simulador')}
-          >
-            <Sliders size={16} />
-            Simulador de Regla de Aforo (Sección 7)
-          </button>
+
           <button
             className={`tab-btn ${activeTab === 'reglas' ? 'active' : ''}`}
             onClick={() => setActiveTab('reglas')}
           >
             <Layers size={16} />
-            Reglas & Autonomía (0 a 4)
+            Reglas
           </button>
           <button
             className={`tab-btn ${activeTab === 'herramientas' ? 'active' : ''}`}
             onClick={() => setActiveTab('herramientas')}
           >
             <Terminal size={16} />
-            Herramientas de Agente & Auditoría
+            Consultas e historial
           </button>
         </div>
       </div>
 
       {/* Viewport Desplazable */}
       <div className="monitoreo-viewport">
+      {error && <p role="alert">{error}</p>}
 
       {/* PESTAÑA 1: MONITOREO Y ALERTAS */}
       {activeTab === 'monitoreo' && (
         <>
+          <Suspense fallback={<p>Cargando herramientas de IA local?</p>}>
+            <LocalAiPanel alerts={alertas} onSaved={fetchData} />
+          </Suspense>
+          {summary?.fuentes?.some((source) => !source.disponible) && <div className="local-ai-panel">
+            <h3>Fuentes sin datos disponibles</h3>
+            {summary.fuentes.filter((source) => !source.disponible).map((source) =>
+              <p key={source.nombre}><strong>{source.nombre}</strong>: {source.motivo ?? 'Sin registros suficientes o lectura desactualizada'}</p>)}
+          </div>}
           {/* Tarjetas KPI */}
           <div className="kpi-cards-grid">
             <div className="kpi-card" style={{ borderLeft: '4px solid #eab308' }}>
               <div className="kpi-card-header">
                 <span>OCUPACIÓN ACTUAL</span>
-                <span className="sev-badge PREVENTIVA">PREVENTIVA</span>
+                <Activity size={18} />
               </div>
               <div className="kpi-value-row">
-                <span className="kpi-number">{summary?.aforo_actual_pct || 92}%</span>
+                <span className="kpi-number">{summary?.aforo_actual_pct != null ? `${summary.aforo_actual_pct}%` : 'Sin datos'}</span>
                 <span className="kpi-subtext">
-                  ({summary?.aforo_presentes || 92} / {summary?.aforo_capacidad || 100} plazas)
+                  ({summary?.aforo_presentes ?? '—'} / {summary?.aforo_capacidad ?? '—'} plazas)
                 </span>
               </div>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                Umbral preventivo configurado: 90%
+                {reglas.find((r) => r.agente_tipo === 'AFORO' && r.activa)
+                  ? `Umbral preventivo: ${reglas.find((r) => r.agente_tipo === 'AFORO' && r.activa).umbral_preventivo}%`
+                  : 'Sin regla de aforo activa'}
               </span>
             </div>
 
@@ -364,9 +256,9 @@ export const MonitoreoInteligentePage: React.FC = () => {
                 <ShieldAlert size={18} color="#ef4444" />
               </div>
               <div className="kpi-value-row">
-                <span className="kpi-number">{summary?.alertas_abiertas ?? 3}</span>
+                <span className="kpi-number">{summary?.alertas_abiertas ?? '—'}</span>
                 <span className="kpi-subtext" style={{ color: '#fca5a5' }}>
-                  ({summary?.alertas_criticas ?? 1} crítica activa)
+                  ({summary?.alertas_criticas ?? '—'} críticas activas)
                 </span>
               </div>
               <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
@@ -376,108 +268,61 @@ export const MonitoreoInteligentePage: React.FC = () => {
 
             <div className="kpi-card" style={{ borderLeft: '4px solid #90ab8b' }}>
               <div className="kpi-card-header">
-                <span>REGLAS DETERMINÍSTICAS</span>
+                <span>REGLAS DE MONITOREO</span>
                 <Layers size={18} color="#90ab8b" />
               </div>
               <div className="kpi-value-row">
-                <span className="kpi-number">{summary?.reglas_activas ?? 5}</span>
+                <span className="kpi-number">{summary?.reglas_activas ?? '—'}</span>
                 <span className="kpi-subtext">activas</span>
               </div>
               <span style={{ fontSize: '0.8rem', color: '#9bb0a5' }}>
-                5 categorías especializadas
+                Configuración actual del monitoreo
               </span>
             </div>
 
             <div className="kpi-card" style={{ borderLeft: '4px solid #6ee7b7' }}>
               <div className="kpi-card-header">
-                <span>MÉTRICAS VALIDACIÓN (SEC. 13)</span>
+                <span>ACTIVIDAD DEL MONITOREO</span>
                 <CheckCircle size={18} color="#6ee7b7" />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.2rem' }}>
                 <span style={{ fontSize: '0.825rem', color: '#ebf4dd' }}>
-                  • Precisión: <strong>{summary?.metricas_validacion?.precision_alertas_pct || 98.2}%</strong> (Obj. &ge; 95%)
+                  Alertas registradas: <strong>{summary?.metricas_validacion?.total_alertas_historicas ?? '—'}</strong>
                 </span>
                 <span style={{ fontSize: '0.825rem', color: '#ebf4dd' }}>
-                  • Latencia: <strong>{summary?.metricas_validacion?.latencia_media_segundos || 0.45}s</strong> (Obj. &le; 10s)
+                  Tiempo medio de evaluación: <strong>{summary?.metricas_validacion?.latencia_media_segundos != null ? `${summary.metricas_validacion.latencia_media_segundos}s` : 'Sin datos'}</strong>
                 </span>
                 <span style={{ fontSize: '0.825rem', color: '#6ee7b7' }}>
-                  • Acciones no autorizadas: <strong>0</strong> | Duplicados: <strong>0</strong>
+                  Alertas resueltas: <strong>{summary?.metricas_validacion?.alertas_resueltas ?? '—'}</strong>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Los 5 Agentes Especializados */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#90ab8b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Los 5 Agentes Especializados de Supervisión (CU-23)
-            </span>
+          <div>
+            <h2 style={{ fontSize: '1rem', color: '#90ab8b' }}>Agentes de monitoreo</h2>
             <div className="agents-grid">
-              <div className="agent-mini-card active">
-                <Users size={18} color="#90ab8b" />
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#ebf4dd' }}>1. Aforo & Concurrencia</div>
-                  <div style={{ fontSize: '0.75rem', color: '#9bb0a5' }}>ms-gimnasio • Ocupación & Horarios</div>
+              {summary?.agentes.map((agente) => (
+                <div key={agente.id} className={`agent-mini-card ${agente.activo ? 'active' : ''}`}>
+                  <Activity size={18} color="#90ab8b" />
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#ebf4dd' }}>{agente.nombre}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#9bb0a5' }}>
+                      {agente.activo ? 'Activo' : 'Inactivo'}
+                    </div>
+                    {isAdmin && <div className="local-ai-controls">
+                      <label>Autonomía máxima<select value={agente.nivel_autonomia} onChange={async (e) => {
+                        try { await axios.put(`/api/agentes/agentes/${agente.tipo}`, { activo: agente.activo, nivel_autonomia_maximo: Number(e.target.value) }); await fetchData(); }
+                        catch { setError('No se pudo configurar el agente.'); }
+                      }}>{[0,1,2,3,4].map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
+                      <button className="btn-secondary" onClick={async () => {
+                        try { await axios.put(`/api/agentes/agentes/${agente.tipo}`, { activo: !agente.activo, nivel_autonomia_maximo: agente.nivel_autonomia }); await fetchData(); }
+                        catch { setError('No se pudo cambiar el estado del agente.'); }
+                      }}>{agente.activo ? 'Desactivar' : 'Activar'}</button>
+                    </div>}
+                  </div>
                 </div>
-              </div>
-              <div className="agent-mini-card active">
-                <TrendingDown size={18} color="#fb923c" />
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#ebf4dd' }}>2. Actividad Comercial</div>
-                  <div style={{ fontSize: '0.75rem', color: '#9bb0a5' }}>ms-gimnasio • Matrículas & Altas</div>
-                </div>
-              </div>
-              <div className="agent-mini-card active">
-                <Sparkles size={18} color="#6ee7b7" />
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#ebf4dd' }}>3. Retención de Clientes</div>
-                  <div style={{ fontSize: '0.75rem', color: '#9bb0a5' }}>ms-machine-learning • Riesgo Churn</div>
-                </div>
-              </div>
-              <div className="agent-mini-card active">
-                <Wrench size={18} color="#38bdf8" />
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#ebf4dd' }}>4. Disponibilidad Operativa</div>
-                  <div style={{ fontSize: '0.75rem', color: '#9bb0a5' }}>ms-inventario • Equipos Críticos</div>
-                </div>
-              </div>
-              <div className="agent-mini-card active">
-                <Clock size={18} color="#facc15" />
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#ebf4dd' }}>5. Seguimiento de Alertas</div>
-                  <div style={{ fontSize: '0.75rem', color: '#9bb0a5' }}>Cierre, Histéresis & SLA</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Barra de Escenarios de Prueba */}
-          <div className="scenarios-bar">
-            <div>
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ebf4dd', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Play size={16} color="#6ee7b7" />
-                Inyección de Escenarios de Validación:
-              </span>
-              <span style={{ fontSize: '0.775rem', color: '#9bb0a5' }}>
-                Ejecuta los casos reales del documento para comprobar deduplicación, histéresis y escalamiento.
-              </span>
-            </div>
-            <div className="scenarios-btn-group">
-              <button className="scenario-btn" onClick={() => handleRunScenario('AFORO_92')}>
-                1. Aforo 92% (Preventivo)
-              </button>
-              <button className="scenario-btn" onClick={() => handleRunScenario('AFORO_100')}>
-                2. Aforo 100% (Crítico - Escalar)
-              </button>
-              <button className="scenario-btn" onClick={() => handleRunScenario('AFORO_82')}>
-                3. Aforo 82% (Cierre Histéresis)
-              </button>
-              <button className="scenario-btn" onClick={() => handleRunScenario('COMERCIAL_CHURN')}>
-                4. Matrículas -25% + ML Churn
-              </button>
-              <button className="scenario-btn" onClick={() => handleRunScenario('OPERATIVO_EQUIPOS')}>
-                5. Equipos (3/5 fuera servicio)
-              </button>
+              ))}
             </div>
           </div>
 
@@ -485,10 +330,10 @@ export const MonitoreoInteligentePage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                Alertas Activas & Recomendaciones Inteligentes ({alertas.length})
+                Alertas y recomendaciones ({alertas.length})
               </h2>
               <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                Ordenadas por severidad y tiempo de atención
+                Actualizadas recientemente
               </span>
             </div>
 
@@ -497,14 +342,12 @@ export const MonitoreoInteligentePage: React.FC = () => {
                 <CheckCircle size={40} color="#6ee7b7" style={{ margin: '0 auto 0.75rem' }} />
                 <h3 style={{ fontFamily: "'Outfit', sans-serif", color: '#ebf4dd' }}>No hay alertas activas en este momento</h3>
                 <p style={{ color: '#9bb0a5' }}>
-                  Todos los indicadores del gimnasio se encuentran dentro de los parámetros normales.
+                  No se han registrado alertas con los datos disponibles.
                 </p>
               </div>
             ) : (
               <div className="alertas-list">
                 {alertas.map((alerta) => {
-                  const isCurrentAnalyzing = analyzingAlertId === alerta.id;
-                  const streamed = streamingText[alerta.id];
 
                   return (
                     <div key={alerta.id} className={`alerta-item-card sev-${alerta.severidad}`}>
@@ -521,16 +364,16 @@ export const MonitoreoInteligentePage: React.FC = () => {
                             Estado: {alerta.estado}
                           </span>
                           <span className="meta-chip">
-                            Confianza: {Math.round((alerta.grado_confianza || 1) * 100)}%
+                            Confianza: {Math.round(alerta.grado_confianza * 100)}%
                           </span>
                         </div>
                       </div>
 
                       <div className="alerta-meta-chips">
-                        <span className="meta-chip">Condición: {alerta.condicion_activadora}</span>
-                        <span className="meta-chip">Valor observado: {alerta.valor_observado}%</span>
-                        {alerta.valor_referencia !== undefined && (
-                          <span className="meta-chip">Referencia: {alerta.valor_referencia}%</span>
+                        <span className="meta-chip">Condición: {formatAlertCondition(alerta.condicion_activadora)}</span>
+                        <span className="meta-chip">Valor observado: {alerta.valor_observado}{alerta.evidencia?.unidad ?? '%'}</span>
+                        {alerta.valor_referencia != null && (
+                          <span className="meta-chip">Referencia: {alerta.valor_referencia}{alerta.evidencia?.unidad ?? '%'}</span>
                         )}
                         <span className="meta-chip">
                           Fuente Explicación:{' '}
@@ -544,7 +387,7 @@ export const MonitoreoInteligentePage: React.FC = () => {
                         <div className="alerta-explanation-box">
                           <strong style={{ color: '#90ab8b' }}>Explicación Sustentada en Hechos:</strong>
                           <p style={{ margin: '0.4rem 0 0 0' }}>
-                            {isCurrentAnalyzing && streamed ? streamed : alerta.explicacion}
+                            {alerta.explicacion}
                           </p>
                         </div>
 
@@ -555,16 +398,7 @@ export const MonitoreoInteligentePage: React.FC = () => {
                       </div>
 
                       <div className="alerta-actions-row">
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            className="btn-primary"
-                            onClick={() => handleAnalyzeWithBrowserAi(alerta)}
-                            disabled={isCurrentAnalyzing}
-                          >
-                            <Sparkles size={14} />
-                            {isCurrentAnalyzing ? 'Generando en Navegador...' : 'Interpretar con IA Local'}
-                          </button>
-                        </div>
+
 
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {alerta.estado !== 'EN_ATENCION' && alerta.estado !== 'RESUELTA' && (
@@ -595,171 +429,16 @@ export const MonitoreoInteligentePage: React.FC = () => {
         </>
       )}
 
-      {/* PESTAÑA 2: SIMULADOR DE REGLA DE AFORO */}
-      {activeTab === 'simulador' && (
-        <div className="simulator-panel">
-          <div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
-              Simulador Interactivo de Regla de Aforo (Sección 7)
-            </h2>
-            <p style={{ color: '#94a3b8', margin: 0 }}>
-              Permite al administrador ajustar parámetros de capacidad, umbrales e histéresis sin modificar el código fuente.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-            <div className="slider-group">
-              <div className="slider-label-row">
-                <span>Capacidad Máxima (Plazas):</span>
-                <strong>{capacidadMax}</strong>
-              </div>
-              <input
-                type="range"
-                min="50"
-                max="250"
-                value={capacidadMax}
-                onChange={(e) => setCapacidadMax(Number(e.target.value))}
-                className="custom-range"
-              />
-            </div>
-
-            <div className="slider-group">
-              <div className="slider-label-row">
-                <span>Personas Presentes (Aforo actual):</span>
-                <strong>{personasPresentes}</strong>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max={capacidadMax}
-                value={personasPresentes}
-                onChange={(e) => setPersonasPresentes(Number(e.target.value))}
-                className="custom-range"
-              />
-            </div>
-
-            <div className="slider-group">
-              <div className="slider-label-row">
-                <span>Umbral Preventivo (%):</span>
-                <strong>{umbralPrev}%</strong>
-              </div>
-              <input
-                type="range"
-                min="70"
-                max="95"
-                value={umbralPrev}
-                onChange={(e) => setUmbralPrev(Number(e.target.value))}
-                className="custom-range"
-              />
-            </div>
-
-            <div className="slider-group">
-              <div className="slider-label-row">
-                <span>Umbral Crítico (%):</span>
-                <strong>{umbralCrit}%</strong>
-              </div>
-              <input
-                type="range"
-                min="95"
-                max="100"
-                value={umbralCrit}
-                onChange={(e) => setUmbralCrit(Number(e.target.value))}
-                className="custom-range"
-              />
-            </div>
-
-            <div className="slider-group">
-              <div className="slider-label-row">
-                <span>Umbral de Histéresis para Cierre (%):</span>
-                <strong>{umbralHist}%</strong>
-              </div>
-              <input
-                type="range"
-                min="60"
-                max="90"
-                value={umbralHist}
-                onChange={(e) => setUmbralHist(Number(e.target.value))}
-                className="custom-range"
-              />
-            </div>
-          </div>
-
-          {/* Tarjeta de Decisión del Agente */}
-          {simResultado && (
-            <div
-              style={{
-                background: 'rgba(26, 35, 42, 0.8)',
-                border: '1px solid rgba(144, 171, 139, 0.25)',
-                borderRadius: '10px',
-                padding: '1.5rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: '1.1rem', color: '#ebf4dd' }}>
-                  Evaluación del Agente en Tiempo Real
-                </span>
-                <span className={`sev-badge ${simResultado.severidad}`}>{simResultado.estado}</span>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#9bb0a5' }}>Ocupación de Sala:</span>
-                  <strong style={{ color: '#ebf4dd' }}>{simResultado.porcentaje_ocupacion}% ({simResultado.personas_presentes} de {simResultado.capacidad_maxima} plazas)</strong>
-                </div>
-                <div style={{ width: '100%', height: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${Math.min(100, simResultado.porcentaje_ocupacion)}%`,
-                      background:
-                        simResultado.porcentaje_ocupacion >= umbralCrit
-                          ? '#f87171'
-                          : simResultado.porcentaje_ocupacion >= umbralPrev
-                          ? '#facc15'
-                          : '#6ee7b7',
-                      transition: 'width 0.3s',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ background: 'rgba(90, 120, 99, 0.12)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #90ab8b' }}>
-                <div style={{ fontWeight: 600, color: '#6ee7b7', marginBottom: '0.25rem' }}>Acción Propuesta por el Agente:</div>
-                <div style={{ fontSize: '0.9rem', color: '#ebf4dd' }}>{simResultado.recomendacion}</div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
-                  className="btn-secondary"
-                  onClick={() => {
-                    setCapacidadMax(100);
-                    setPersonasPresentes(92);
-                    setUmbralPrev(90);
-                    setUmbralCrit(100);
-                    setUmbralHist(85);
-                  }}
-                >
-                  <RotateCcw size={14} />
-                  Restablecer Ejemplo del Documento (92%)
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* PESTAÑA 3: REGLAS Y NIVELES DE AUTONOMÍA */}
       {activeTab === 'reglas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {editingRule && <RuleEditor key={editingRule.id} rule={editingRule} onClose={() => setEditingRule(null)} onSaved={fetchData} />}
           <div>
             <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: '#ebf4dd' }}>
-              Configuración de Reglas Determinísticas y Niveles de Autonomía (Secciones 7 y 8)
+              Reglas de monitoreo
             </h2>
             <p style={{ color: '#9bb0a5', margin: 0 }}>
-              Reglas editables en caliente sin reiniciar servicios. Niveles: 0 (Observación), 1 (Alerta), 2 (Recomendación), 3 (Automatización n8n), 4 (Acción Sensible con confirmación).
+              Consulta los umbrales, tiempos de espera y niveles de autonomía configurados.
+              {' '}El nivel aplicado es el menor entre el nivel de la regla y el máximo del agente. Cambiar el máximo no modifica el nivel configurado en cada regla.
             </p>
           </div>
 
@@ -774,8 +453,9 @@ export const MonitoreoInteligentePage: React.FC = () => {
                   <th>Umbral Crít.</th>
                   <th>Histéresis Cierre</th>
                   <th>Cooldown</th>
-                  <th>Nivel Autonomía</th>
+                  <th>Autonomía aplicada</th>
                   <th>Estado</th>
+                  {isAdmin && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -790,14 +470,18 @@ export const MonitoreoInteligentePage: React.FC = () => {
                     <td>{r.cooldown_seg}s</td>
                     <td>
                       <span className="ai-chip" style={{ background: 'rgba(90, 120, 99, 0.25)', color: '#ebf4dd' }}>
-                        Nivel {r.nivel_autonomia}
+                        Nivel {Math.min(r.nivel_autonomia, summary?.agentes.find((agent) => agent.tipo === r.agente_tipo)?.nivel_autonomia ?? r.nivel_autonomia)}
                       </span>
+                      <div style={{ fontSize: '0.75rem', marginTop: '.35rem' }}>
+                        Regla: {r.nivel_autonomia} · Máximo del agente: {summary?.agentes.find((agent) => agent.tipo === r.agente_tipo)?.nivel_autonomia ?? '—'}
+                      </div>
                     </td>
                     <td>
                       <span style={{ color: r.activa ? '#6ee7b7' : '#f87171', fontWeight: 600 }}>
                         {r.activa ? 'Activa' : 'Inactiva'}
                       </span>
                     </td>
+                    {isAdmin && <td><button className="btn-secondary" onClick={() => setEditingRule(r)}>Editar</button></td>}
                   </tr>
                 ))}
               </tbody>
@@ -809,33 +493,59 @@ export const MonitoreoInteligentePage: React.FC = () => {
       {/* PESTAÑA 4: HERRAMIENTAS Y AUDITORÍA */}
       {activeTab === 'herramientas' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <section className="local-ai-panel">
+            <h2>Acciones del agente</h2>
+            {actions.length === 0 && <p>No hay acciones registradas.</p>}
+            {groupedActions.map((action) => <div key={action.id} className="agent-action-item">
+              <p><strong>{actionLabels[action.tipo_accion] ?? action.tipo_accion.replaceAll('_', ' ')}</strong>
+                {' · '}{action.estado.replaceAll('_', ' ').toLowerCase()}
+                {action.repeticiones > 1 && <span className="meta-chip">{action.repeticiones} registros</span>}</p>
+              {action.resultado && <p>{action.resultado}</p>}
+              {action.propuesta && <p><strong>Propuesta para revisar:</strong> {action.propuesta}</p>}
+              {isAdmin && action.estado === 'PENDIENTE_APROBACION' && <div className="local-ai-controls">
+                {[true, false].map((approved) => <button key={String(approved)} className="btn-secondary"
+                  disabled={busyActions[action.id]} onClick={() => submitAction(action, 'autorizar', { aprobado: approved })}>
+                  {approved ? 'Aprobar propuesta' : 'Rechazar propuesta'}</button>)}
+              </div>}
+              {action.motivo_bloqueo && <p>{action.motivo_bloqueo}</p>}
+              {isAdmin && action.motivo_bloqueo?.includes('destinatarios') && <button className="btn-secondary" onClick={() => {
+                const rule = reglas.find((r) => r.id === action.regla_id);
+                if (rule) { setEditingRule(rule); setActiveTab('reglas'); }
+              }}>Configurar destinatarios</button>}
+              {isAdmin && action.estado === 'APROBADA' && action.puede_despachar && <button className="btn-secondary"
+                disabled={!action.puede_despachar || busyActions[action.id]}
+                onClick={() => submitAction(action, 'ejecutar')}>
+                {busyActions[action.id] ? 'Despachando…' : 'Despachar propuesta aprobada al workflow'}</button>}
+              {actionErrors[action.id] && <p role="alert">{actionErrors[action.id]}</p>}
+            </div>)}
+          </section>
           {/* Tool Calling Runner */}
-          <div className="simulator-panel">
+          <div className="tools-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ebf4dd' }}>
                 <Terminal size={20} color="#6ee7b7" />
-                Herramientas Autorizadas del Agente (Tool-Calling)
+                Consultas de datos
               </h2>
             </div>
             <p style={{ color: '#9bb0a5', margin: 0 }}>
-              Invoca de forma directa las herramientas que utiliza el agente para consultar los microservicios sin acceso directo a SQL.
+              Consulta los datos disponibles para cada indicador.
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               <button className="btn-secondary" onClick={() => handleExecuteTool('obtener_aforo_actual')} disabled={executingTool}>
-                obtener_aforo_actual()
+                Aforo actual
               </button>
               <button className="btn-secondary" onClick={() => handleExecuteTool('obtener_resumen_inscripciones')} disabled={executingTool}>
-                obtener_resumen_inscripciones()
+                Inscripciones
               </button>
               <button className="btn-secondary" onClick={() => handleExecuteTool('obtener_equipos_fuera_servicio')} disabled={executingTool}>
-                obtener_equipos_fuera_servicio()
+                Disponibilidad de equipos
               </button>
               <button className="btn-secondary" onClick={() => handleExecuteTool('obtener_resumen_riesgo_abandono')} disabled={executingTool}>
-                obtener_resumen_riesgo_abandono()
+                Riesgo de abandono
               </button>
               <button className="btn-secondary" onClick={() => handleExecuteTool('obtener_membresias_por_vencer')} disabled={executingTool}>
-                obtener_membresias_por_vencer()
+                Membresías por vencer
               </button>
             </div>
 
@@ -860,7 +570,7 @@ export const MonitoreoInteligentePage: React.FC = () => {
           {/* Tabla de Auditoría Inmutable */}
           <div>
             <h2 style={{ fontFamily: "'Outfit', sans-serif", fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: '#ebf4dd' }}>
-              Bitácora de Decisiones & Auditoría Inmutable (CU-23)
+              Historial de decisiones
             </h2>
             <div className="data-table-wrap">
               <table className="custom-table">

@@ -14,7 +14,7 @@ import java.util.UUID;
 public interface SpringDataRegistroAccesoRepository extends JpaRepository<RegistroAccesoEntity, UUID> {
     @Query("SELECT r FROM RegistroAccesoEntity r " +
            "WHERE (:clienteId IS NULL OR r.clienteId = :clienteId) " +
-           "ORDER BY r.fechaHora DESC")
+           "ORDER BY r.fechaHora DESC, r.id DESC")
     List<RegistroAccesoEntity> findByFilter(@Param("clienteId") UUID clienteId, Pageable pageable);
 
     @Query("SELECT r FROM RegistroAccesoEntity r " +

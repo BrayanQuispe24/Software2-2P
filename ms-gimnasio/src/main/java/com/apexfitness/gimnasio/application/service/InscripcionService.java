@@ -180,6 +180,14 @@ public class InscripcionService implements InscripcionUseCase {
     }
 
     @Override
+    public List<BoletaInscripcion> listarInscripcionesPagina(int pagina, int limite) {
+        if (pagina < 0 || limite < 1 || limite > 500) {
+            throw new IllegalArgumentException("Página inválida: página >= 0 y límite entre 1 y 500");
+        }
+        return inscripcionRepository.findPage(pagina, limite);
+    }
+
+    @Override
     public Optional<BoletaInscripcion> buscarPorId(UUID id) {
         return inscripcionRepository.findById(id);
     }
