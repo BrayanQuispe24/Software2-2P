@@ -365,7 +365,25 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+}
+
+#microfrontend-container::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+#microfrontend-container::-webkit-scrollbar-track {
+  background: rgba(22, 32, 38, 0.5);
+}
+
+#microfrontend-container::-webkit-scrollbar-thumb {
+  background: rgba(144, 171, 139, 0.3);
+  border-radius: 4px;
+}
+
+#microfrontend-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(144, 171, 139, 0.5);
 }
 
 /* Backdrop para mobile drawer */
