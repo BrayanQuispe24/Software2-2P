@@ -1,0 +1,29 @@
+services:
+  ms-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ms-mcp-app
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      PORT: 8090
+      HOST: 0.0.0.0
+      LOG_LEVEL: INFO
+      DEFAULT_TIMEZONE: America/La_Paz
+      GYM_SERVICE_URL: ${GYM_SERVICE_URL:-http://34.132.143.14:8082}
+      INVENTARIO_SERVICE_URL: ${INVENTARIO_SERVICE_URL:-http://34.132.143.14:8084}
+      ENTRENAMIENTO_SERVICE_URL: ${ENTRENAMIENTO_SERVICE_URL:-http://34.132.143.14:8083}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-https://api.apexfitness.bratox.me}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:-https://api.apexfitness.bratox.me/oidc/jwks}
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-mcp_agentes_7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d}
+      GATEWAY_INTERNAL_TOKEN: ${GATEWAY_INTERNAL_TOKEN:-mcp_gateway_1f2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c}
+    volumes:
+      - mcp_data:/app/data
+      - mcp_exports:/app/exports
+
+volumes:
+  mcp_data:
+  mcp_exports:
+
