@@ -28,10 +28,11 @@ def main():
         print("✅ Esquema de base de datos verificado.")
 
         # Cargar datos
+        force = "--force" in sys.argv
         db = SessionLocal()
         try:
-            print("⏳ Cargando alertas, indicadores, anomalías y acciones...")
-            resultado = ejecutar_carga_datos_reales(db)
+            print("⏳ Cargando indicadores, evaluando reglas y sincronizando consultas...")
+            resultado = ejecutar_carga_datos_reales(db, force=force)
             print("=" * 70)
             if resultado.get("already_seeded"):
                 print(f"⚠️ AVISO: {resultado['message']}")

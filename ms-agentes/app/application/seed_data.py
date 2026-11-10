@@ -196,7 +196,7 @@ def sembrar_datos_origen_inventario():
         return False
 
 
-def ejecutar_carga_datos_reales(db: Session) -> dict:
+def ejecutar_carga_datos_reales(db: Session, force: bool = False) -> dict:
     """
     Ejecuta la siembra de los DATOS OPERATIVOS para que el motor del agente genere las alertas
     a través del ciclo oficial O-A-D-A-E.
@@ -206,13 +206,13 @@ def ejecutar_carga_datos_reales(db: Session) -> dict:
     Las alertas son creadas únicamente por RulesEngine.procesar_alerta_con_deduplicacion
     dentro de AgentOrchestratorService.ejecutar_ciclo_completo.
     """
-    # 0. Verificación de ejecución única
+    # 0. Verificación de ejecución única (salvo force=True para actualizar fuentes y consultas)
     ya_cargado = db.query(EjecucionAgenteModel).filter_by(tipo_ejecucion="CARGA_INICIAL_REAL").first()
-    if ya_cargado:
+    if ya_cargado and not force:
         return {
             "success": False,
             "already_seeded": True,
-            "message": "Los datos reales del agente ya fueron cargados previamente y esta operación solo se permite 1 sola vez.",
+            "message": "Los datos reales del agente ya fueron cargados previamente. Usa force=True para re-sincronizar consultas.",
             "cargado_en": ya_cargado.created_at.isoformat() if ya_cargado.created_at else None,
         }
 
@@ -304,6 +304,39 @@ def ejecutar_carga_datos_reales(db: Session) -> dict:
                 "fuera_servicio": 7,
                 "disponible": True,
                 "error": None
+            }
+        ),
+        # Indicador 5: Membresías por Vencer (14 en los próximos 15 días)
+        IndicadorNegocio(
+            nombre="Membresías por Vencer",
+            valor_actual=14.0,
+            valor_referencia=None,
+            unidad="membresias",
+            sede_id="SEDE-CENTRAL",
+            servicio_origen="ms-gimnasio",
+            confiable=True,
+            metadata={
+                "ventana_dias": 15,
+                "por_vencer": 14,
+                "planes_afectados": ["Plan Mensual Libre", "Paquete 12 Sesiones"],
+                "disponible": True
+            }
+        ),
+        # Indicador 6: Afluencia Horaria / Asistencias (48 entradas registradas hoy)
+        IndicadorNegocio(
+            nombre="Afluencia Horaria",
+            valor_actual=48.0,
+            valor_referencia=None,
+            unidad="entradas",
+            sede_id="SEDE-CENTRAL",
+            servicio_origen="ms-gimnasio",
+            confiable=True,
+            metadata={
+                "entradas_totales_hoy": 48,
+                "horario_pico": "18:00 - 20:00",
+                "fecha_inicio": (datetime.now(timezone.utc).date() - timedelta(days=6)).isoformat(),
+                "fecha_fin": datetime.now(timezone.utc).date().isoformat(),
+                "disponible": True
             }
         ),
     ]

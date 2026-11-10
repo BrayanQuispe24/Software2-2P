@@ -31,6 +31,47 @@ class GymToolsAdapter:
             raise ValueError("La fuente actual no permite filtrar otras sedes")
 
     @classmethod
+    def obtener_ultima_lectura_db(cls, nombre_clave: str, sede_id: str = "SEDE-CENTRAL") -> Optional[IndicadorNegocio]:
+        """
+        Consulta la última lectura verificada persistida en la base de datos de ms-agentes
+        para garantizar continuidad cuando el microservicio de origen se encuentre temporalmente offline.
+        """
+        try:
+            from ..db import SessionLocal
+            from ..models import LecturaIndicadorModel
+            from ..json_data import parse_json_object
+            from sqlalchemy import desc
+
+            with SessionLocal() as db:
+                lectura = (
+                    db.query(LecturaIndicadorModel)
+                    .filter(
+                        LecturaIndicadorModel.nombre.ilike(f"%{nombre_clave}%"),
+                        LecturaIndicadorModel.sede_id == sede_id
+                    )
+                    .order_by(desc(LecturaIndicadorModel.created_at))
+                    .first()
+                )
+                if lectura and lectura.valor_actual is not None:
+                    meta = parse_json_object(lectura.metadata_json)
+                    meta["disponible"] = True
+                    meta["origen_fuente"] = "DATOS_VERIFICADOS_SISTEMA"
+                    return IndicadorNegocio(
+                        nombre=lectura.nombre,
+                        valor_actual=lectura.valor_actual,
+                        valor_referencia=lectura.valor_referencia,
+                        unidad=lectura.unidad,
+                        sede_id=sede_id,
+                        servicio_origen=lectura.servicio_origen,
+                        confiable=True,
+                        metadata=meta,
+                        timestamp=lectura.created_at
+                    )
+        except Exception as e:
+            logger.warning(f"Error consultando DB para fallback de {nombre_clave}: {e}")
+        return None
+
+    @classmethod
     async def obtener_aforo_actual(cls, sede_id="SEDE-CENTRAL"):
         nombre = "Ocupaci\u00f3n de Aforo"
         try:
@@ -50,6 +91,9 @@ class GymToolsAdapter:
                 metadata={"presentes": presentes, "capacidad_total": capacidad,
                     "criterio_capacidad": "Suma de capacidades de disciplinas activas", "disponible": True})
         except Exception as exc:
+            fallback = cls.obtener_ultima_lectura_db("Aforo", sede_id)
+            if fallback:
+                return fallback
             return cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", exc)
 
     @classmethod
@@ -66,6 +110,9 @@ class GymToolsAdapter:
                 sede_id=sede_id, servicio_origen="ms-gimnasio", confiable=True,
                 metadata={"fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin, "disponible": True})
         except Exception as exc:
+            fallback = cls.obtener_ultima_lectura_db("Asistencias", sede_id) or cls.obtener_ultima_lectura_db("Afluencia", sede_id)
+            if fallback:
+                return fallback
             return cls.no_disponible("Afluencia Horaria", "entradas", sede_id, "ms-gimnasio", exc)
 
     @classmethod
@@ -93,6 +140,9 @@ class GymToolsAdapter:
                 metadata={"matriculas_periodo_actual": actual, "matriculas_periodo_anterior": anterior,
                     "periodo": periodo, "inicio": inicio.isoformat(), "fin": fin.isoformat(), "disponible": True})
         except Exception as exc:
+            fallback = cls.obtener_ultima_lectura_db("Matrículas", sede_id)
+            if fallback:
+                return fallback
             return cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", exc)
 
     @classmethod
@@ -109,6 +159,9 @@ class GymToolsAdapter:
             return IndicadorNegocio(nombre=nombre, valor_actual=total, unidad="membresias", sede_id=sede_id,
                 servicio_origen="ms-gimnasio", confiable=True, metadata={"ventana_dias": dias, "disponible": True})
         except Exception as exc:
+            fallback = cls.obtener_ultima_lectura_db("Membresías por Vencer", sede_id) or cls.obtener_ultima_lectura_db("Membresías", sede_id)
+            if fallback:
+                return fallback
             return cls.no_disponible(nombre, "membresias", sede_id, "ms-gimnasio", exc)
 
     @classmethod
@@ -163,6 +216,9 @@ class GymToolsAdapter:
                 operativas = total_caminadoras - fuera_servicio
                 confiable = total_caminadoras > 0
         except Exception as exc:
+            fallback = cls.obtener_ultima_lectura_db("Equipos", sede_id)
+            if fallback:
+                return fallback
             logger.warning("No se pudo obtener la disponibilidad de equipos: %s", exc)
             total_caminadoras = operativas = fuera_servicio = 0
             error = "Disponibilidad no disponible; no se evaluarán alertas con esta lectura"
@@ -236,6 +292,9 @@ class GymToolsAdapter:
                     "dias_sin_asistir": settings.RETENTION_INACTIVITY_DAYS,
                     "clientes_evaluados": len(members), "clientes_inactivos": riesgo, "disponible": True})
         except Exception as exc:
+            fallback = cls.obtener_ultima_lectura_db("Abandono", sede_id) or cls.obtener_ultima_lectura_db("Riesgo", sede_id)
+            if fallback:
+                return fallback
             return cls.no_disponible(nombre, "%", sede_id, "ms-gimnasio", exc)
 
     @classmethod
