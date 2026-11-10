@@ -31,6 +31,7 @@ interface AgentAction {
 }
 
 interface DashboardSummary {
+  datos_iniciales_cargados?: boolean;
   monitoreo_activo: boolean;
   fuentes: { nombre: string; disponible: boolean; motivo?: string }[];
   aforo_actual_pct: number | null;
@@ -55,6 +56,13 @@ export const MonitoreoInteligentePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'monitoreo' | 'reglas' | 'herramientas'>('monitoreo');
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [alertas, setAlertas] = useState<AlertaData[]>([]);
+  const [alreadySeeded, setAlreadySeeded] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('apex_agent_data_seeded') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingRule, setEditingRule] = useState<any>(null);
@@ -117,6 +125,10 @@ export const MonitoreoInteligentePage: React.FC = () => {
       setReglas(regRes.data);
       setHistorial(histRes.data);
       setActions(actionRes.data);
+      if (sumRes.data?.datos_iniciales_cargados || alertRes.data?.length > 0) {
+        setAlreadySeeded(true);
+        try { localStorage.setItem('apex_agent_data_seeded', 'true'); } catch {}
+      }
       setError('');
     } catch (e) {
       console.warn('Error al cargar datos de ms-agentes:', e);
@@ -186,6 +198,26 @@ export const MonitoreoInteligentePage: React.FC = () => {
               catch { setError('La evaluación no pudo completarse.'); }
               finally { setLoading(false); }
             }}>Evaluar datos actuales</button>
+            {!alreadySeeded && !summary?.datos_iniciales_cargados && alertas.length === 0 && (
+              <button className="btn-secondary" disabled={loading} onClick={async () => {
+                setLoading(true);
+                try {
+                  const res = await axios.post('/api/agentes/seed-data');
+                  if (res.data?.already_seeded) {
+                    setError('Los datos ya fueron cargados previamente.');
+                  }
+                  setAlreadySeeded(true);
+                  try { localStorage.setItem('apex_agent_data_seeded', 'true'); } catch {}
+                  await fetchData();
+                } catch {
+                  setError('No se pudieron cargar los datos reales en el agente.');
+                } finally {
+                  setLoading(false);
+                }
+              }}>
+                Cargar datos reales
+              </button>
+            )}
           </div>
         </div>
 

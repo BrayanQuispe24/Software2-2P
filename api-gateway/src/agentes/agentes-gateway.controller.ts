@@ -308,6 +308,24 @@ export class AgentesGatewayController {
     }
   }
 
+  @Post('seed-data')
+  async seedRealData(@Req() req: Request, @Res() res: Response) {
+    this.validateAuth(req);
+    try {
+      const response = await fetch(`${this.agentesServiceUrl}/seed-data`, {
+        method: 'POST',
+        headers: this.internalHeaders(req),
+      });
+      const data = await response.json();
+      return res.status(response.status).json(data);
+    } catch (error: any) {
+      return res.status(HttpStatus.BAD_GATEWAY).json({
+        error: 'agentes_service_error',
+        message: `Error al cargar datos en ms-agentes: ${error.message}`,
+      });
+    }
+  }
+
   @Get('historial')
   async getHistorial(@Req() req: Request, @Res() res: Response, @Query('limit') limit = '50') {
     this.validateAuth(req);

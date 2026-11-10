@@ -237,7 +237,13 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         if ultimas_ejecuciones else None
     )
 
+    datos_iniciales_cargados = bool(
+        db.query(EjecucionAgenteModel).filter_by(tipo_ejecucion="CARGA_INICIAL_REAL").first()
+        or db.query(AlertaModel).count() > 0
+    )
+
     return {
+        "datos_iniciales_cargados": datos_iniciales_cargados,
         "monitoreo_activo": bool(settings.SCHEDULER_ENABLED and ultimas_ejecuciones and
             AgentOrchestratorService.utc(ultimas_ejecuciones[0].created_at) >= cutoff),
         "intervalo_segundos": settings.MONITOR_INTERVAL_SECONDS,
@@ -621,4 +627,12 @@ def indicator_response(indicator):
     if not indicator.confiable:
         data["valor_actual"] = None
     return data
+
+# 13. Carga de Datos Reales e Importantes
+@router.post("/seed-data")
+def seed_real_data(db: Session = Depends(get_db)):
+    from ..application.seed_data import ejecutar_carga_datos_reales
+    resultado = ejecutar_carga_datos_reales(db)
+    return resultado
+
 
