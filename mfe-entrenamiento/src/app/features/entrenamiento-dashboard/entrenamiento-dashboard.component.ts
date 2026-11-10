@@ -341,9 +341,12 @@ export class EntrenamientoDashboardComponent implements OnInit {
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       let users: any[] | null = null;
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const usersApiUrl = isLocal ? 'http://localhost:3000/api/users' : '/api/users';
+
       // 1. Intento por API Gateway (incluyendo cookies de sesión http-only)
       try {
-        const res = await fetch('http://localhost:3000/api/users', {
+        const res = await fetch(usersApiUrl, {
           headers,
           credentials: 'include',
         });
@@ -352,8 +355,8 @@ export class EntrenamientoDashboardComponent implements OnInit {
         users = null;
       }
 
-      // 2. Intento directo por MS Auth (puerto 4000)
-      if (!users || !Array.isArray(users)) {
+      // 2. Intento directo como respaldo si es local
+      if ((!users || !Array.isArray(users)) && isLocal) {
         try {
           const res = await fetch('http://localhost:4000/users', {
             headers,

@@ -69,8 +69,17 @@ const FALLBACK_CLIENTES_SEMILLA: Cliente[] = [
   providedIn: 'root',
 })
 export class ClienteHttpRepository implements ClienteRepository {
-  private readonly authUsersUrl = 'http://localhost:4000/users';
-  private readonly gatewayUsersUrl = 'http://localhost:3000/api/users';
+  private get isLocal(): boolean {
+    return typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  }
+
+  private get gatewayUsersUrl(): string {
+    return this.isLocal ? 'http://localhost:3000/api/users' : '/api/users';
+  }
+
+  private get authUsersUrl(): string {
+    return this.isLocal ? 'http://localhost:4000/users' : '/api/users';
+  }
 
   async listarClientesActivos(): Promise<Cliente[]> {
     let clientesRemotos: Cliente[] | null = null;

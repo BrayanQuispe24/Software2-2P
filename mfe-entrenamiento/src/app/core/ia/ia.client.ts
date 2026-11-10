@@ -69,8 +69,17 @@ export interface StatelessAnalysisResponse {
   providedIn: 'root',
 })
 export class IaClientService {
-  private readonly gatewayUrl = 'http://localhost:3000/api/ia';
-  private readonly directFastApiUrl = 'http://localhost:8000/api/v1';
+  private get isLocal(): boolean {
+    return typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  }
+
+  private get gatewayUrl(): string {
+    return this.isLocal ? 'http://localhost:3000/api/ia' : '/api/ia';
+  }
+
+  private get directFastApiUrl(): string {
+    return this.isLocal ? 'http://localhost:8000/api/v1' : '/ia/deep/api/v1';
+  }
 
   async analyzeAndRecommend(formData: FormData): Promise<StatelessAnalysisResponse> {
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
