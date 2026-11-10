@@ -503,14 +503,18 @@ export class EntrenamientoDashboardComponent implements OnInit {
 
   obtenerImagenPrincipal(e: Ejercicio): string | null {
     if (e.imagenes && e.imagenes.length > 0) {
-      return `/exercises/${e.imagenes[0]}`;
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const base = isLocal ? '' : '/mfe/entrenamiento';
+      return `${base}/exercises/${e.imagenes[0]}`;
     }
     return null;
   }
 
   obtenerImagenFase(e: Ejercicio, index: number): string | null {
     if (e.imagenes && e.imagenes.length > index) {
-      return `/exercises/${e.imagenes[index]}`;
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const base = isLocal ? '' : '/mfe/entrenamiento';
+      return `${base}/exercises/${e.imagenes[index]}`;
     }
     return null;
   }
