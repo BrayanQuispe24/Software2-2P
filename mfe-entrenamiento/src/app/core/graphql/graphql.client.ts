@@ -9,7 +9,9 @@ export interface GraphQLResponse<T> {
   providedIn: 'root',
 })
 export class GraphQLClientService {
-  private readonly endpoint = 'http://localhost:8083/graphql';
+  private readonly endpoint = typeof location !== 'undefined' && location.port === '9102'
+    ? 'http://localhost:8083/graphql'
+    : '/graphql/entrenamiento';
 
   async query<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
