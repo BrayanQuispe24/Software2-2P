@@ -13,6 +13,8 @@ services:
       - VITE_MFE_ENTRENAMIENTO_URL=${VITE_MFE_ENTRENAMIENTO_URL:-http://localhost:9102}
       - VITE_MFE_GIMNASIO_URL=${VITE_MFE_GIMNASIO_URL:-http://localhost:9105}
       - VITE_MFE_INVENTARIO_URL=${VITE_MFE_INVENTARIO_URL:-http://localhost:9104}
+    extra_hosts:
+      - "api-gateway:host-gateway"
     networks:
       - fitness-network
 

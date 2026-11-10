@@ -9,7 +9,9 @@ export interface GraphQLResponse<T> {
   providedIn: 'root',
 })
 export class GraphQLClientService {
-  private readonly endpoint = 'http://localhost:8084/graphql';
+  private readonly endpoint = typeof location !== 'undefined' && location.port === '9104'
+    ? 'http://localhost:8084/graphql'
+    : '/graphql/inventario';
 
   async query<T>(query: string, variables: Record<string, any> = {}): Promise<T> {
     const response = await fetch(this.endpoint, {

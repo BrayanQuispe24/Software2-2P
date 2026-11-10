@@ -10,7 +10,8 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
 
-  const cookieSecure = config.get('COOKIE_SECURE') === 'true';
+  const cookieSecure = config.get('COOKIE_SECURE') === 'true' || config.get('NODE_ENV') === 'production';
+  const cookieDomain = config.get<string>('COOKIE_DOMAIN');
 
   app.use(
     session({
@@ -23,14 +24,27 @@ async function bootstrap() {
         httpOnly: true,
         secure: cookieSecure,
         sameSite: 'lax',
+        domain: cookieDomain || undefined,
         maxAge: 8 * 60 * 60 * 1000,
       },
     }),
   );
 
+  const allowedOrigins = [
+    config.get<string>('FRONTEND_URL'),
+    'https://apexfitness.bratox.me',
+    'https://api.apexfitness.bratox.me',
+  ].filter(Boolean) as string[];
+
   app.enableCors({
     origin: (origin: any, callback: any) => {
-      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      if (
+        !origin ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+        origin.endsWith('.bratox.me') ||
+        origin === 'https://bratox.me' ||
+        allowedOrigins.includes(origin)
+      ) {
         callback(null, true);
       } else {
         callback(null, false);

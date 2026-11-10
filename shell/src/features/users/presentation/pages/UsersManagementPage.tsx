@@ -76,7 +76,7 @@ export function UsersManagementPage() {
     queryKey: ['gimnasio', 'inscripciones-disciplinas-map'],
     queryFn: async () => {
       try {
-        const res = await fetch('http://localhost:8082/graphql', {
+        const res = await fetch('/graphql/gimnasio', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

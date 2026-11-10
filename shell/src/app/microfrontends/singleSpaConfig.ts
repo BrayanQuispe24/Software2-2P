@@ -16,10 +16,12 @@ export interface MicrofrontendAppConfig {
  * single-spa los descargará y montará dinámicamente.
  */
 const env = (import.meta as unknown as { env?: Record<string, string> })?.env || {};
-const mfeEntrenamientoUrl = env['VITE_MFE_ENTRENAMIENTO_URL'] || 'http://localhost:9102';
-const mfeClientesUrl = env['VITE_MFE_CLIENTES_URL'] || 'http://localhost:9103';
-const mfeInventarioUrl = env['VITE_MFE_INVENTARIO_URL'] || 'http://localhost:9104';
-const mfeGimnasioUrl = env['VITE_MFE_GIMNASIO_URL'] || 'http://localhost:9105';
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const mfeEntrenamientoUrl = env['VITE_MFE_ENTRENAMIENTO_URL'] || (isLocalhost ? 'http://localhost:9102' : '/mfe/entrenamiento');
+const mfeClientesUrl = env['VITE_MFE_CLIENTES_URL'] || (isLocalhost ? 'http://localhost:9103' : '/mfe/clientes');
+const mfeInventarioUrl = env['VITE_MFE_INVENTARIO_URL'] || (isLocalhost ? 'http://localhost:9104' : '/mfe/inventario');
+const mfeGimnasioUrl = env['VITE_MFE_GIMNASIO_URL'] || (isLocalhost ? 'http://localhost:9105' : '/mfe/gimnasio');
 
 export const REGISTERED_MFES: MicrofrontendAppConfig[] = [
   {

@@ -52,7 +52,17 @@ export class AuthController {
     delete req.session.oidcPending;
 
     const port = this.config.get('PORT', 3000);
-    const callbackUrl = new URL(req.originalUrl, `http://localhost:${port}`);
+    const configuredRedirectUri = this.config.get<string>('OIDC_REDIRECT_URI');
+    let callbackUrl: URL;
+    if (configuredRedirectUri) {
+      callbackUrl = new URL(configuredRedirectUri);
+      const incoming = new URL(req.originalUrl, 'http://localhost');
+      incoming.searchParams.forEach((val, key) => {
+        callbackUrl.searchParams.set(key, val);
+      });
+    } else {
+      callbackUrl = new URL(req.originalUrl, `http://localhost:${port}`);
+    }
 
     let tokens;
     try {

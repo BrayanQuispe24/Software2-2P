@@ -7,8 +7,8 @@ import type {
   SocioProfile,
 } from '../domain/socio.types';
 
-const MS_GIMNASIO_URL = 'http://localhost:8082/graphql';
-const MS_ENTRENAMIENTO_URL = 'http://localhost:8083/graphql';
+const MS_GIMNASIO_URL = '/graphql/gimnasio';
+const MS_ENTRENAMIENTO_URL = '/graphql/entrenamiento';
 
 async function fetchGraphQL<T>(url: string, query: string, variables: Record<string, any> = {}): Promise<T> {
   const response = await fetch(url, {
