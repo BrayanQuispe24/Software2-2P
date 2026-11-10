@@ -81,6 +81,8 @@ export function createOidcConfig(prisma: PrismaService): Configuration {
         redirect_uris: [
           'http://localhost:3000/auth/callback',
           'http://localhost/auth/callback',
+          'https://apexfitness.bratox.me/auth/callback',
+          'https://api.apexfitness.bratox.me/auth/callback',
         ],
         post_logout_redirect_uris: [
           'http://localhost:3000/',
@@ -88,6 +90,10 @@ export function createOidcConfig(prisma: PrismaService): Configuration {
           'http://localhost:5173',
           'http://localhost/login',
           'http://localhost',
+          'https://apexfitness.bratox.me/login',
+          'https://apexfitness.bratox.me',
+          'https://api.apexfitness.bratox.me/login',
+          'https://api.apexfitness.bratox.me',
         ],
         response_types: ['code'],
         grant_types: ['authorization_code', 'refresh_token'],
