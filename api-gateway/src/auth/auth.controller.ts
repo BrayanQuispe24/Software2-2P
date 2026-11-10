@@ -17,7 +17,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly config: ConfigService,
-  ) {}
+  ) { }
 
   @Get('login')
   async login(@Req() req: Request, @Res() res: Response) {
@@ -45,8 +45,9 @@ export class AuthController {
     console.log(`[CALLBACK] SID=${req.sessionID} CookiesIn=${req.headers.cookie ?? 'none'} HasPending=${Boolean(req.session.oidcPending)} Url=${req.originalUrl}`);
     const pending = req.session.oidcPending;
     if (!pending) {
-      console.warn(`[CALLBACK 401] No oidcPending found for session ${req.sessionID}`);
-      throw new UnauthorizedException('No existe una autenticación pendiente o ya fue procesada');
+      console.warn(`[CALLBACK 401] No oidcPending found for session ${req.sessionID}. Redirigiendo al login del frontend.`);
+      const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+      return res.redirect(`${frontendUrl}/login?reason=session_expired`);
     }
 
     delete req.session.oidcPending;

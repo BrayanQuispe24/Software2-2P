@@ -10,7 +10,7 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
 
-  const cookieSecure = config.get('COOKIE_SECURE') === 'true' || config.get('NODE_ENV') === 'production';
+  const cookieSecure = config.get('COOKIE_SECURE') === 'true';
   const cookieDomain = config.get<string>('COOKIE_DOMAIN');
 
   app.use(

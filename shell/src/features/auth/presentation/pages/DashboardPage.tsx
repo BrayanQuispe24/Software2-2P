@@ -1,9 +1,47 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Award, Users, UserCheck, QrCode, FileText, Dumbbell, Wrench, Activity } from 'lucide-react';
+import { Award, Users, UserCheck, QrCode, FileText, Dumbbell, Wrench, Activity, BrainCircuit, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useSessionQuery } from '../hooks/useSessionQuery';
+import axios from 'axios';
+
+interface ChurnSummaryData {
+  estado: string;
+  modelo_version: string;
+  algoritmo: string;
+  total_evaluados: number;
+  tasa_riesgo_alto_pct: number;
+  tasa_riesgo_medio_pct: number;
+  tasa_riesgo_bajo_pct: number;
+  distribucion: { BAJO: number; MEDIO: number; ALTO: number };
+  predicciones_muestra?: Array<{
+    cliente_id: string;
+    probabilidad: number;
+    nivel_riesgo: string;
+    factores: string[];
+    recomendaciones: string[];
+  }>;
+}
 
 export function DashboardPage() {
   const { data: session } = useSessionQuery();
+  const [churnData, setChurnData] = useState<ChurnSummaryData | null>(null);
+  const [loadingChurn, setLoadingChurn] = useState<boolean>(false);
+
+  const fetchChurn = async () => {
+    setLoadingChurn(true);
+    try {
+      const res = await axios.get('/api/churn/summary');
+      setChurnData(res.data);
+    } catch (e) {
+      console.error('Error al consultar métricas de Churn ML:', e);
+    } finally {
+      setLoadingChurn(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChurn();
+  }, []);
 
   const user = session?.user;
   const roles = user?.roles || [];
@@ -23,6 +61,96 @@ export function DashboardPage() {
       </div>
 
       <div className="dashboard-grid">
+          <div className="card full-width" style={{ borderLeft: '4px solid #38bdf8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <BrainCircuit size={22} style={{ color: '#38bdf8' }} />
+                <h3 style={{ margin: 0 }}>Predicción de Abandono y Retención (Random Forest ML)</h3>
+                <span className="badge badge-mini" style={{ background: churnData?.estado === 'ACTIVO' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: churnData?.estado === 'ACTIVO' ? '#38bdf8' : '#f87171' }}>
+                  {churnData?.estado === 'ACTIVO' ? `MODELO ACTIVO (v${churnData?.modelo_version})` : 'MODELO OFFLINE'}
+                </span>
+              </div>
+              <button
+                onClick={fetchChurn}
+                disabled={loadingChurn}
+                className="btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                <RefreshCw size={13} className={loadingChurn ? 'animate-spin' : ''} />
+                <span>Recalcular Inferencia</span>
+              </button>
+            </div>
+
+            {churnData && churnData.estado === 'ACTIVO' ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', padding: '0.9rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                      <AlertTriangle size={16} color="#f87171" />
+                      <span style={{ fontSize: '0.8rem', color: '#fca5a5', fontWeight: 600 }}>Alto Riesgo de Abandono</span>
+                    </div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#f87171' }}>
+                      {churnData.tasa_riesgo_alto_pct}%
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      {churnData.distribucion.ALTO} socio(s) en umbral crítico
+                    </span>
+                  </div>
+
+                  <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '8px', padding: '0.9rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#fde047', fontWeight: 600 }}>Riesgo Moderado</span>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#facc15' }}>
+                      {churnData.tasa_riesgo_medio_pct}%
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      {churnData.distribucion.MEDIO} socio(s) en seguimiento
+                    </span>
+                  </div>
+
+                  <div style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: '8px', padding: '0.9rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                      <ShieldCheck size={16} color="#4ade80" />
+                      <span style={{ fontSize: '0.8rem', color: '#86efac', fontWeight: 600 }}>Bajo Riesgo / Fidelizados</span>
+                    </div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#4ade80' }}>
+                      {churnData.tasa_riesgo_bajo_pct}%
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      {churnData.distribucion.BAJO} socio(s) estables
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.8rem', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.4rem', fontWeight: 600 }}>
+                    Muestreo de Inferencia en Tiempo Real (Top Evaluados por Motor ML):
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {churnData.predicciones_muestra?.map((p) => (
+                      <span
+                        key={p.cliente_id}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.3rem 0.6rem',
+                          borderRadius: '4px',
+                          background: p.nivel_riesgo === 'ALTO' ? 'rgba(239, 68, 68, 0.2)' : p.nivel_riesgo === 'MEDIO' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                          color: p.nivel_riesgo === 'ALTO' ? '#fca5a5' : p.nivel_riesgo === 'MEDIO' ? '#fde047' : '#86efac',
+                          border: `1px solid ${p.nivel_riesgo === 'ALTO' ? 'rgba(239, 68, 68, 0.3)' : p.nivel_riesgo === 'MEDIO' ? 'rgba(234, 179, 8, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
+                        }}
+                      >
+                        <strong>{p.cliente_id}</strong>: {p.probabilidad}% prob. ({p.nivel_riesgo})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '0.5rem 0' }}>
+                {loadingChurn ? 'Consultando inferencia del motor Random Forest...' : 'Motor de Machine Learning en proceso de inicio o en espera.'}
+              </div>
+            )}
+          </div>
+
           <div className="card">
             <h3>Identidad del Usuario</h3>
             <div className="info-row">
