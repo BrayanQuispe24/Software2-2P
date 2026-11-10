@@ -7,6 +7,7 @@ import { IaGatewayModule } from './ia/ia-gateway.module.js';
 import { AgentesGatewayModule } from './agentes/agentes-gateway.module.js';
 import { ReportesGatewayModule } from './reportes/reportes-gateway.module.js';
 import { ChurnGatewayModule } from './churn/churn-gateway.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { HealthController } from './common/controllers/health.controller.js';
@@ -23,6 +24,7 @@ import { IdempotencyInterceptor } from './common/interceptors/idempotency.interc
     AgentesGatewayModule,
     ReportesGatewayModule,
     ChurnGatewayModule,
+    NotificationsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [
