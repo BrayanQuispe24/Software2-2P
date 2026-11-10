@@ -6,12 +6,14 @@ class Settings(BaseSettings):
     PORT: int = 8085
     DATABASE_URL: str = "postgresql://agentes_user:agentes_dev_password@localhost:5436/ms_agentes_db"
     
-    # Servicios externos (GraphQL / REST)
+    # Servicios externos (GraphQL / REST / MCP)
     GYM_SERVICE_URL: str = "http://localhost:8082"
     INVENTARIO_SERVICE_URL: str = "http://localhost:8084"
     ENTRENAMIENTO_SERVICE_URL: str = "http://localhost:8083"
     ML_SERVICE_URL: str = "http://localhost:8000"
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/agente-alerta"
+    MCP_SERVICE_URL: str = "http://localhost:8090"
+    MCP_INTERNAL_TOKEN: str = "af_mcp_agente_prod_2026_k83m1"
 
     # Planificador
     SCHEDULER_ENABLED: bool = True

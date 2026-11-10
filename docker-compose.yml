@@ -229,10 +229,13 @@ services:
       REDIS_PORT: 6379
       AGENTES_SERVICE_URL: http://ms-agentes:8085/api/v1
       AGENTES_INTERNAL_TOKEN: ${AGENTES_INTERNAL_TOKEN:-apex-local-agentes-77fa62d3a2c74ce0beba4a113069f804}
+      REPORTES_SERVICE_URL: ${REPORTES_SERVICE_URL:-http://ms-mcp:8090/api/v1}
+      REPORTES_INTERNAL_TOKEN: ${REPORTES_INTERNAL_TOKEN:-mcp_gateway_1f2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c}
     depends_on:
       - ms-auth
       - redis
       - ms-agentes
+      - ms-mcp
     networks:
       - fitness-network
 
@@ -346,11 +349,37 @@ services:
       GYM_SERVICE_URL: http://ms-gimnasio:8082
       INVENTARIO_SERVICE_URL: http://ms-inventario:8084
       ENTRENAMIENTO_SERVICE_URL: http://ms-entrenamiento:8083
+      MCP_SERVICE_URL: http://ms-mcp:8090
+      MCP_INTERNAL_TOKEN: mcp_agentes_7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d
       ML_SERVICE_URL: ${ML_SERVICE_URL:-http://host.docker.internal:8000}
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://host.docker.internal:5678/webhook/agente-alerta}
     depends_on:
       db-agentes:
         condition: service_healthy
+    networks:
+      - fitness-network
+
+  # ==========================================
+  # SERVIDOR MCP Y REPORTES ANALÍTICOS (CU-REPORTES-MCP)
+  # ==========================================
+  ms-mcp:
+    build:
+      context: ./ms-mcp
+      dockerfile: Dockerfile
+    container_name: global-ms-mcp
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      PORT: 8090
+      GYM_SERVICE_URL: http://ms-gimnasio:8082
+      INVENTARIO_SERVICE_URL: http://ms-inventario:8084
+      ENTRENAMIENTO_SERVICE_URL: http://ms-entrenamiento:8083
+      AUTH_SERVICE_URL: http://ms-auth:4000
+      OIDC_JWKS_URL: http://ms-auth:4000/oidc/jwks
+      DEFAULT_TIMEZONE: America/La_Paz
+    volumes:
+      - data-mcp:/app/data
     networks:
       - fitness-network
 
@@ -418,6 +447,7 @@ services:
       - mfe-entrenamiento
       - mfe-gimnasio
       - mfe-inventario
+      - ms-mcp
     networks:
       - fitness-network
 
@@ -427,6 +457,7 @@ volumes:
   data-inventario:
   data-entrenamiento:
   data-agentes:
+  data-mcp:
   data-redis:
   data-dynamodb:
   data-mongodb:
