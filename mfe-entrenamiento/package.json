@@ -4,7 +4,8 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --port 9102",
-    "build": "ng build",
+    "build": "ng build --base-href /mfe/entrenamiento/",
+    "build:local": "ng build --base-href /",
     "watch": "ng build --watch --configuration development"
   },
   "private": true,
