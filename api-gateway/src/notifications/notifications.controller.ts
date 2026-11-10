@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Res, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
-import { NotificationsService, PushNotificationPayload } from './notifications.service.js';
+import { NotificationsService } from './notifications.service.js';
+import type { PushNotificationPayload } from './notifications.service.js';
 
 @Controller('api/notifications')
 export class NotificationsController {
@@ -68,4 +69,3 @@ export class NotificationsController {
     });
   }
 }
-
