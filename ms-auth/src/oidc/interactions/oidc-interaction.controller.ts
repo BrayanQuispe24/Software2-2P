@@ -298,6 +298,7 @@ export class OidcInteractionController {
   }
 
   private renderExpiredHtml(): string {
+    const loginUrl = process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/login` : '/login';
     return `
       <!DOCTYPE html>
       <html lang="es">
@@ -318,7 +319,7 @@ export class OidcInteractionController {
         <div class="card">
           <h2>Sesión Expirada o Inválida</h2>
           <p>La sesión de autenticación ha expirado, ya fue utilizada o la ventana estuvo abierta por mucho tiempo.</p>
-          <a href="http://localhost:5173/login" class="btn">Iniciar Sesión Nuevamente</a>
+          <a href="${loginUrl}" class="btn">Iniciar Sesión Nuevamente</a>
         </div>
       </body>
       </html>
