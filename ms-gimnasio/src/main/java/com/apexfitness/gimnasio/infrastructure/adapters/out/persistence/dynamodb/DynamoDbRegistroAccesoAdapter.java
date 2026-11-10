@@ -30,7 +30,7 @@ public class DynamoDbRegistroAccesoAdapter implements RegistroAccesoRepositoryPo
 
     @Override
     public List<RegistroAcceso> findAll(UUID clienteId, int limite) {
-        int safeLimit = Math.max(1, Math.min(limite, 100));
+        int safeLimit = Math.max(1, Math.min(limite, 500));
         List<RegistroAcceso> result = new ArrayList<>();
 
         try {
@@ -74,6 +74,17 @@ public class DynamoDbRegistroAccesoAdapter implements RegistroAccesoRepositoryPo
         }
 
         return result;
+    }
+
+    @Override
+    public List<RegistroAcceso> findPage(int pagina, int limite) {
+        int safeLimit = Math.max(1, Math.min(limite, 500));
+        int safePage = Math.max(0, pagina);
+        int needed = (safePage + 1) * safeLimit;
+        List<RegistroAcceso> items = findAll(null, needed);
+        int from = Math.min(safePage * safeLimit, items.size());
+        int to = Math.min(from + safeLimit, items.size());
+        return new ArrayList<>(items.subList(from, to));
     }
 
     @Override
