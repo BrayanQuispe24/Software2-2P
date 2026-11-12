@@ -2,6 +2,7 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EQUIPO_REPOSITORY, MANTENIMIENTO_REPOSITORY, MOVIMIENTO_REPOSITORY } from '../../core/tokens/injection-tokens';
+import { isOfflineOrNetworkError } from '../../core/graphql/graphql.client';
 import { ListarEquiposUseCase } from '../equipos/application/listar-equipos.use-case';
 import { CrearEquipoUseCase } from '../equipos/application/crear-equipo.use-case';
 import { CambiarEstadoEquipoUseCase } from '../equipos/application/cambiar-estado-equipo.use-case';
@@ -138,7 +139,7 @@ export class InventarioDashboardComponent implements OnInit {
       if (tiposData.length > 0) this.nuevoEquipo.tipoEquipoId = tiposData[0].id;
       if (tiposMovData.length > 0) this.nuevoMovimiento.tipoMovimientoId = tiposMovData[0].id;
     } catch (err: any) {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (isOfflineOrNetworkError(err)) {
         this.errorMessage.set(null);
       } else {
         this.errorMessage.set(err.message || 'Error al conectar con el microservicio de inventario');
@@ -150,6 +151,7 @@ export class InventarioDashboardComponent implements OnInit {
 
   setTab(tab: 'equipos' | 'crear-equipo' | 'mantenimientos' | 'ambientes' | 'marcas' | 'kardex'): void {
     this.activeTab.set(tab);
+    this.errorMessage.set(null);
     if (tab === 'mantenimientos') {
       this.recargarAlertas();
     }
@@ -160,7 +162,9 @@ export class InventarioDashboardComponent implements OnInit {
       const data = await this.consultarAlertasUC.execute(30);
       this.alertas.set(data);
     } catch (err: any) {
-      this.errorMessage.set(err.message);
+      if (!isOfflineOrNetworkError(err)) {
+        this.errorMessage.set(err.message);
+      }
     }
   }
 

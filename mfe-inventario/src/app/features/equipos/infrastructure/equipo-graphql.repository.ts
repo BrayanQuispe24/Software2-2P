@@ -227,39 +227,184 @@ export class EquipoGraphQLRepository implements EquipoRepositoryPort {
   }
 
   async listarAmbientes(): Promise<AmbienteRef[]> {
+    const cacheKey = 'apex_cached_ambientes_list';
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+
     try {
       const data = await this.client.query<any>(CATALOGOS_QUERY);
-      return data?.ambientes || [];
+      const list = data?.ambientes || [];
+      if (list.length > 0) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(list));
+        } catch {}
+      }
+      return list;
     } catch {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) return JSON.parse(raw);
+      } catch {}
       return [
-        { id: 'amb-1', nombre: 'Sala de Musculación Principal' },
-        { id: 'amb-2', nombre: 'Zona Cardio' },
-        { id: 'amb-3', nombre: 'Salón de Spinning' },
+        { id: 'amb-1', nombre: 'Sala de Musculación Principal', estado: 'ACTIVO' },
+        { id: 'amb-2', nombre: 'Zona Cardio', estado: 'ACTIVO' },
+        { id: 'amb-3', nombre: 'Salón de Spinning', estado: 'ACTIVO' },
       ];
     }
   }
 
   async crearAmbiente(nombre: string, descripcion?: string): Promise<AmbienteRef> {
-    const data = await this.client.query<any>(CREAR_AMBIENTE_MUTATION, { nombre, descripcion });
-    return data?.crearAmbiente;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return this.enqueueCrearAmbienteOffline(nombre, descripcion);
+    }
+
+    try {
+      const data = await this.client.query<any>(CREAR_AMBIENTE_MUTATION, { nombre, descripcion });
+      const created = data?.crearAmbiente;
+      if (created) {
+        const current = await this.listarAmbientes();
+        try {
+          localStorage.setItem('apex_cached_ambientes_list', JSON.stringify([...current, created]));
+        } catch {}
+      }
+      return created;
+    } catch (error) {
+      if (isOfflineOrNetworkError(error)) {
+        return this.enqueueCrearAmbienteOffline(nombre, descripcion);
+      }
+      throw error;
+    }
+  }
+
+  private async enqueueCrearAmbienteOffline(nombre: string, descripcion?: string): Promise<AmbienteRef> {
+    const localId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `amb_${Date.now()}`;
+    const syncEngine = getGlobalSyncEngine();
+
+    const optimistic: AmbienteRef = {
+      id: localId,
+      nombre,
+      descripcion,
+      estado: 'ACTIVO',
+    };
+
+    if (syncEngine && typeof syncEngine.enqueueMutation === 'function') {
+      try {
+        await syncEngine.enqueueMutation({
+          entityType: 'AMBIENTE',
+          operationType: 'CREATE',
+          endpoint: '/graphql/inventario',
+          httpMethod: 'POST',
+          payload: {
+            query: CREAR_AMBIENTE_MUTATION,
+            variables: { nombre, descripcion },
+          },
+        });
+      } catch (err) {
+        console.warn('[EquipoGraphQLRepository] Error al encolar ambiente en SyncEngine:', err);
+      }
+    }
+
+    try {
+      const current = await this.listarAmbientes();
+      localStorage.setItem('apex_cached_ambientes_list', JSON.stringify([...current.filter((a) => a.id !== localId), optimistic]));
+    } catch {}
+
+    return optimistic;
   }
 
   async listarMarcas(): Promise<MarcaRef[]> {
+    const cacheKey = 'apex_cached_marcas_list';
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+
     try {
       const data = await this.client.query<any>(CATALOGOS_QUERY);
-      return data?.marcas || [];
+      const list = data?.marcas || [];
+      if (list.length > 0) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(list));
+        } catch {}
+      }
+      return list;
     } catch {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) return JSON.parse(raw);
+      } catch {}
       return [
-        { id: 'marca-1', nombre: 'Life Fitness' },
-        { id: 'marca-2', nombre: 'Technogym' },
-        { id: 'marca-3', nombre: 'Matrix Fitness' },
+        { id: 'marca-1', nombre: 'Life Fitness', estado: 'ACTIVO' },
+        { id: 'marca-2', nombre: 'Technogym', estado: 'ACTIVO' },
+        { id: 'marca-3', nombre: 'Matrix Fitness', estado: 'ACTIVO' },
+        { id: 'marca-4', nombre: 'Hammer Strength', estado: 'ACTIVO' },
+        { id: 'marca-5', nombre: 'Rogue Fitness', estado: 'ACTIVO' },
       ];
     }
   }
 
   async crearMarca(nombre: string): Promise<MarcaRef> {
-    const data = await this.client.query<any>(CREAR_MARCA_MUTATION, { nombre });
-    return data?.crearMarca;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return this.enqueueCrearMarcaOffline(nombre);
+    }
+
+    try {
+      const data = await this.client.query<any>(CREAR_MARCA_MUTATION, { nombre });
+      const created = data?.crearMarca;
+      if (created) {
+        const current = await this.listarMarcas();
+        try {
+          localStorage.setItem('apex_cached_marcas_list', JSON.stringify([...current, created]));
+        } catch {}
+      }
+      return created;
+    } catch (error) {
+      if (isOfflineOrNetworkError(error)) {
+        return this.enqueueCrearMarcaOffline(nombre);
+      }
+      throw error;
+    }
+  }
+
+  private async enqueueCrearMarcaOffline(nombre: string): Promise<MarcaRef> {
+    const localId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `marca_${Date.now()}`;
+    const syncEngine = getGlobalSyncEngine();
+
+    const optimistic: MarcaRef = {
+      id: localId,
+      nombre,
+      estado: 'ACTIVO',
+    };
+
+    if (syncEngine && typeof syncEngine.enqueueMutation === 'function') {
+      try {
+        await syncEngine.enqueueMutation({
+          entityType: 'MARCA',
+          operationType: 'CREATE',
+          endpoint: '/graphql/inventario',
+          httpMethod: 'POST',
+          payload: {
+            query: CREAR_MARCA_MUTATION,
+            variables: { nombre },
+          },
+        });
+      } catch (err) {
+        console.warn('[EquipoGraphQLRepository] Error al encolar marca en SyncEngine:', err);
+      }
+    }
+
+    try {
+      const current = await this.listarMarcas();
+      localStorage.setItem('apex_cached_marcas_list', JSON.stringify([...current.filter((m) => m.id !== localId), optimistic]));
+    } catch {}
+
+    return optimistic;
   }
 
   async listarTiposEquipo(): Promise<TipoEquipoRef[]> {
