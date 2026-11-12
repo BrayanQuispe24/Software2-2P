@@ -118,12 +118,12 @@ export class InventarioDashboardComponent implements OnInit {
     this.errorMessage.set(null);
     try {
       const [equiposData, alertasData, ambData, marcasData, tiposData, tiposMovData] = await Promise.all([
-        this.listarEquiposUC.execute(),
-        this.consultarAlertasUC.execute(15),
-        this.equipoRepo.listarAmbientes(),
-        this.equipoRepo.listarMarcas(),
-        this.equipoRepo.listarTiposEquipo(),
-        this.movimientoRepo.listarTiposMovimiento(),
+        this.listarEquiposUC.execute().catch(() => []),
+        this.consultarAlertasUC.execute(15).catch(() => []),
+        this.equipoRepo.listarAmbientes().catch(() => []),
+        this.equipoRepo.listarMarcas().catch(() => []),
+        this.equipoRepo.listarTiposEquipo().catch(() => []),
+        this.movimientoRepo.listarTiposMovimiento().catch(() => []),
       ]);
 
       this.equipos.set(equiposData);
@@ -138,7 +138,11 @@ export class InventarioDashboardComponent implements OnInit {
       if (tiposData.length > 0) this.nuevoEquipo.tipoEquipoId = tiposData[0].id;
       if (tiposMovData.length > 0) this.nuevoMovimiento.tipoMovimientoId = tiposMovData[0].id;
     } catch (err: any) {
-      this.errorMessage.set(err.message || 'Error al conectar con el microservicio de inventario');
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        this.errorMessage.set(null);
+      } else {
+        this.errorMessage.set(err.message || 'Error al conectar con el microservicio de inventario');
+      }
     } finally {
       this.isLoading.set(false);
     }
