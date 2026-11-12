@@ -29,9 +29,9 @@ services:
       DATABASE_URL: postgresql://agentes_user:agentes_dev_password@db-agentes:5432/ms_agentes_db
       PORT: 8085
       INTERNAL_API_TOKEN: ${AGENTES_INTERNAL_TOKEN:-af_internal_agentes_token_2026}
-      GYM_SERVICE_URL: ${GYM_SERVICE_URL:-http://34.132.143.14:8082}
-      INVENTARIO_SERVICE_URL: ${INVENTARIO_SERVICE_URL:-http://34.132.143.14:8084}
-      ENTRENAMIENTO_SERVICE_URL: ${ENTRENAMIENTO_SERVICE_URL:-http://34.132.143.14:8083}
+      GYM_SERVICE_URL: http://34.69.21.179:8082
+      INVENTARIO_SERVICE_URL: http://34.69.21.179:8084
+      ENTRENAMIENTO_SERVICE_URL: http://34.69.21.179:8083
       MCP_SERVICE_URL: ${MCP_SERVICE_URL:-http://host.docker.internal:8090}
       ML_SERVICE_URL: ${ML_SERVICE_URL:-http://host.docker.internal:8000}
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://host.docker.internal:5678/webhook/agente-alerta}
